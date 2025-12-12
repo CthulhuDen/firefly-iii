@@ -32,6 +32,7 @@ use FireflyIII\Repositories\Budget\OperationsRepositoryInterface;
 use FireflyIII\Support\Facades\Navigation;
 use FireflyIII\Support\Facades\Steam;
 use FireflyIII\Support\Http\Controllers\AugumentData;
+use FireflyIII\Support\Http\Controllers\HasCharts;
 use FireflyIII\Support\Http\Controllers\TransactionCalculation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
@@ -45,12 +46,10 @@ class BudgetReportController extends Controller
 {
     use AugumentData;
     use TransactionCalculation;
+    use HasCharts;
 
-    /** @var GeneratorInterface Chart generation methods. */
-    private $generator;
-
-    /** @var OperationsRepositoryInterface */
-    private $opsRepository;
+    private GeneratorInterface $generator;
+    private OperationsRepositoryInterface $opsRepository;
 
     /**
      * BudgetReportController constructor.
@@ -73,27 +72,11 @@ class BudgetReportController extends Controller
      */
     public function budgetExpense(Collection $accounts, Collection $budgets, Carbon $start, Carbon $end): JsonResponse
     {
-        $result = [];
-        $spent  = $this->opsRepository->listExpenses($start, $end, $accounts, $budgets);
-
-        // loop expenses.
-        foreach ($spent as $currency) {
-            foreach ($currency['budgets'] as $budget) {
-                $title = sprintf('%s (%s)', $budget['name'], $currency['currency_name']);
-                $result[$title] ??= [
-                    'amount'          => '0',
-                    'currency_symbol' => $currency['currency_symbol'],
-                    'currency_code'   => $currency['currency_code'],
-                ];
-                foreach ($budget['transaction_journals'] as $journal) {
-                    $amount                   = Steam::positive($journal['amount']);
-                    $result[$title]['amount'] = bcadd($result[$title]['amount'], $amount);
-                }
-            }
-        }
-
-        $data   = $this->generator->multiCurrencyPieChart($result);
-
+        $spent     = $this->opsRepository->listExpenses($start, $end, $accounts, $budgets);
+        $getBudget = fn (array $journal, array $budget) => $budget['name'];
+        $data      = $this->convertToPrimary
+            ? $this->formatPieChartPrimaryCurrency($spent, 'budgets', $getBudget)
+            : $this->formatPieChartMultiCurrency($spent, 'budgets', $getBudget);
         return response()->json($data);
     }
 
@@ -102,28 +85,11 @@ class BudgetReportController extends Controller
      */
     public function categoryExpense(Collection $accounts, Collection $budgets, Carbon $start, Carbon $end): JsonResponse
     {
-        $result = [];
-        $spent  = $this->opsRepository->listExpenses($start, $end, $accounts, $budgets);
-        // loop expenses.
-        foreach ($spent as $currency) {
-            foreach ($currency['budgets'] as $budget) {
-                foreach ($budget['transaction_journals'] as $journal) {
-                    $categoryName             = $journal['category_name'] ?? trans('firefly.no_category');
-                    $title                    = sprintf('%s (%s)', $categoryName, $currency['currency_name']);
-                    $result[$title] ??= [
-                        'amount'          => '0',
-                        'currency_symbol' => $currency['currency_symbol'],
-                        'currency_code'   => $currency['currency_code'],
-                    ];
-
-                    $amount                   = Steam::positive($journal['amount']);
-                    $result[$title]['amount'] = bcadd($result[$title]['amount'], $amount);
-                }
-            }
-        }
-
-        $data   = $this->generator->multiCurrencyPieChart($result);
-
+        $spent       = $this->opsRepository->listExpenses($start, $end, $accounts, $budgets);
+        $getCategory = fn (array $journal) => $journal['category_name'] ?? trans('firefly.no_category');
+        $data        = $this->convertToPrimary
+            ? $this->formatPieChartPrimaryCurrency($spent, 'budgets', $getCategory)
+            : $this->formatPieChartMultiCurrency($spent, 'budgets', $getCategory);
         return response()->json($data);
     }
 
@@ -132,28 +98,11 @@ class BudgetReportController extends Controller
      */
     public function destinationAccountExpense(Collection $accounts, Collection $budgets, Carbon $start, Carbon $end): JsonResponse
     {
-        $result = [];
-        $spent  = $this->opsRepository->listExpenses($start, $end, $accounts, $budgets);
-
-        // loop expenses.
-        foreach ($spent as $currency) {
-            foreach ($currency['budgets'] as $budget) {
-                foreach ($budget['transaction_journals'] as $journal) {
-                    $title                    = sprintf('%s (%s)', $journal['destination_account_name'], $currency['currency_name']);
-                    $result[$title] ??= [
-                        'amount'          => '0',
-                        'currency_symbol' => $currency['currency_symbol'],
-                        'currency_code'   => $currency['currency_code'],
-                    ];
-
-                    $amount                   = Steam::positive($journal['amount']);
-                    $result[$title]['amount'] = bcadd($result[$title]['amount'], $amount);
-                }
-            }
-        }
-
-        $data   = $this->generator->multiCurrencyPieChart($result);
-
+        $spent          = $this->opsRepository->listExpenses($start, $end, $accounts, $budgets);
+        $getDestination = fn (array $journal) => $journal['destination_account_name'];
+        $data           = $this->convertToPrimary
+            ? $this->formatPieChartPrimaryCurrency($spent, 'budgets', $getDestination)
+            : $this->formatPieChartMultiCurrency($spent, 'budgets', $getDestination);
         return response()->json($data);
     }
 
@@ -220,28 +169,11 @@ class BudgetReportController extends Controller
      */
     public function sourceAccountExpense(Collection $accounts, Collection $budgets, Carbon $start, Carbon $end): JsonResponse
     {
-        $result = [];
-        $spent  = $this->opsRepository->listExpenses($start, $end, $accounts, $budgets);
-
-        // loop expenses.
-        foreach ($spent as $currency) {
-            foreach ($currency['budgets'] as $budget) {
-                foreach ($budget['transaction_journals'] as $journal) {
-                    $title                    = sprintf('%s (%s)', $journal['source_account_name'], $currency['currency_name']);
-                    $result[$title] ??= [
-                        'amount'          => '0',
-                        'currency_symbol' => $currency['currency_symbol'],
-                        'currency_code'   => $currency['currency_code'],
-                    ];
-
-                    $amount                   = Steam::positive($journal['amount']);
-                    $result[$title]['amount'] = bcadd($result[$title]['amount'], $amount);
-                }
-            }
-        }
-
-        $data   = $this->generator->multiCurrencyPieChart($result);
-
+        $spent     = $this->opsRepository->listExpenses($start, $end, $accounts, $budgets);
+        $getSource = fn (array $journal) => $journal['source_account_name'];
+        $data      = $this->convertToPrimary
+            ? $this->formatPieChartPrimaryCurrency($spent, 'budgets', $getSource)
+            : $this->formatPieChartMultiCurrency($spent, 'budgets', $getSource);
         return response()->json($data);
     }
 }
