@@ -44,8 +44,8 @@ use Illuminate\Support\Collection;
 class CategoryReportController extends Controller
 {
     use AugumentData;
-    use TransactionCalculation;
     use HasCharts;
+    use TransactionCalculation;
 
     private GeneratorInterface $generator;
     private OperationsRepositoryInterface $opsRepository;
@@ -73,6 +73,7 @@ class CategoryReportController extends Controller
         $data      = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($spent, 'categories', $getBudget)
             : $this->formatPieChartMultiCurrency($spent, 'categories', $getBudget);
+
         return response()->json($data);
     }
 
@@ -83,6 +84,7 @@ class CategoryReportController extends Controller
         $data        = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($spent, 'categories', $getCategory)
             : $this->formatPieChartMultiCurrency($spent, 'categories', $getCategory);
+
         return response()->json($data);
     }
 
@@ -93,6 +95,7 @@ class CategoryReportController extends Controller
         $data        = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($earned, 'categories', $getCategory)
             : $this->formatPieChartMultiCurrency($earned, 'categories', $getCategory);
+
         return response()->json($data);
     }
 
@@ -103,6 +106,7 @@ class CategoryReportController extends Controller
         $data           = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($spent, 'categories', $getDestination)
             : $this->formatPieChartMultiCurrency($spent, 'categories', $getDestination);
+
         return response()->json($data);
     }
 
@@ -113,6 +117,7 @@ class CategoryReportController extends Controller
         $data           = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($earned, 'categories', $getDestination)
             : $this->formatPieChartMultiCurrency($earned, 'categories', $getDestination);
+
         return response()->json($data);
     }
 
@@ -208,6 +213,7 @@ class CategoryReportController extends Controller
         $data      = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($spent, 'categories', $getSource)
             : $this->formatPieChartMultiCurrency($spent, 'categories', $getSource);
+
         return response()->json($data);
     }
 
@@ -218,6 +224,7 @@ class CategoryReportController extends Controller
         $data      = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($earned, 'categories', $getSource)
             : $this->formatPieChartMultiCurrency($earned, 'categories', $getSource);
+
         return response()->json($data);
     }
 }

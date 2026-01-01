@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace FireflyIII\Support\Http\Controllers;
 
 use Carbon\Carbon;
@@ -19,9 +21,9 @@ trait HasCharts
 
         // loop expenses.
         foreach ($byCurrency as $currency) {
-            if ($units === null) {
+            if (null === $units) {
                 foreach ($currency['transaction_journals'] as $journal) {
-                    $title = sprintf('%s (%s)', $getTitle($journal, $currency), $currency['currency_name']);
+                    $title                    = sprintf('%s (%s)', $getTitle($journal, $currency), $currency['currency_name']);
                     $result[$title] ??= [
                         'amount'          => '0',
                         'currency_symbol' => $currency['currency_symbol'],
@@ -35,7 +37,7 @@ trait HasCharts
                 /** @var array $unit */
                 foreach ($currency[$units] as $unit) {
                     foreach ($unit['transaction_journals'] as $journal) {
-                        $title = sprintf('%s (%s)', $getTitle($journal, $unit, $currency), $currency['currency_name']);
+                        $title                    = sprintf('%s (%s)', $getTitle($journal, $unit, $currency), $currency['currency_name']);
                         $result[$title] ??= [
                             'amount'          => '0',
                             'currency_symbol' => $currency['currency_symbol'],
@@ -50,6 +52,7 @@ trait HasCharts
         }
 
         $this->generator ??= app(GeneratorInterface::class);
+
         return $this->generator->multiCurrencyPieChart($result);
     }
 
@@ -59,14 +62,14 @@ trait HasCharts
         $this->currencyRepository ??= app(CurrencyRepositoryInterface::class);
         $currencies = $this->currencyRepository->get()->keyBy('id');
 
-        $result = [];
+        $result     = [];
         foreach ($byCurrency as $currency) {
             $originalCurrency = $currencies[$currency['currency_id']];
-            $amountByTitle = [];
+            $amountByTitle    = [];
 
-            if ($units === null) {
+            if (null === $units) {
                 foreach ($currency['transaction_journals'] as $journal) {
-                    $title = $getTitle($journal, $currency);
+                    $title                 = $getTitle($journal, $currency);
 
                     $amount                = Steam::positive($journal['amount']);
                     $amountByTitle[$title] = bcadd($amountByTitle[$title] ?? '0', $amount);
@@ -75,7 +78,7 @@ trait HasCharts
                 /** @var array $unit */
                 foreach ($currency[$units] as $unit) {
                     foreach ($unit['transaction_journals'] as $journal) {
-                        $title = $getTitle($journal, $unit, $currency);
+                        $title                 = $getTitle($journal, $unit, $currency);
 
                         $amount                = Steam::positive($journal['amount']);
                         $amountByTitle[$title] = bcadd($amountByTitle[$title] ?? '0', $amount);
@@ -90,12 +93,13 @@ trait HasCharts
                     'currency_code'   => $this->primaryCurrency->code,
                 ];
 
-                $amountPC = $converter->convert($originalCurrency, $this->primaryCurrency, Carbon::now(), $amount);
+                $amountPC                 = $converter->convert($originalCurrency, $this->primaryCurrency, Carbon::now(), $amount);
                 $result[$title]['amount'] = bcadd($result[$title]['amount'], $amountPC);
             }
         }
 
-        $this->generator ??= app(GeneratorInterface::class);
+        $this->generator          ??= app(GeneratorInterface::class);
+
         return $this->generator->multiCurrencyPieChart($result);
     }
 }

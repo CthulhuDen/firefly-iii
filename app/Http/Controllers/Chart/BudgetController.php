@@ -109,7 +109,7 @@ class BudgetController extends Controller
         while ($end >= $loopStart) {
             /** @var Carbon $loopEnd */
             $loopEnd                = Navigation::endOfPeriod($loopStart, $step);
-            $spent                  = $this->opsRepository->sumExpenses($loopStart, $loopEnd, null, $collection); // this method already converts to primary currency.
+            $spent                  = $this->opsRepository->sumExpenses($loopStart, $loopEnd, null, $collection, null, $this->convertToPrimary);
             $label                  = trim(Navigation::periodShow($loopStart, $step));
 
             foreach ($spent as $row) {
@@ -170,15 +170,16 @@ class BudgetController extends Controller
         $entries                                = [];
         $amount                                 = $budgetLimit->amount ?? '0';
         $budgetCollection                       = new Collection()->push($budget);
-        $currency                               = $budgetLimit->transactionCurrency;
+        $currency                               = $filterCurrency = $budgetLimit->transactionCurrency;
         if ($this->convertToPrimary) {
-            $amount   = $budgetLimit->native_amount ?? $amount;
-            $currency = $this->primaryCurrency;
+            $amount         = $budgetLimit->native_amount ?? $amount;
+            $currency       = $this->primaryCurrency;
+            $filterCurrency = null;
         }
 
         while ($start <= $end) {
             $current          = clone $start;
-            $expenses         = $this->opsRepository->sumExpenses($current, $current, null, $budgetCollection, $budgetLimit->transactionCurrency, $this->convertToPrimary);
+            $expenses         = $this->opsRepository->sumExpenses($current, $current, null, $budgetCollection, $filterCurrency, $this->convertToPrimary);
             $spent            = $expenses[$currency->id]['sum'] ?? '0';
             $amount           = bcadd((string) $amount, $spent);
             $format           = $start->isoFormat((string) trans('config.month_and_day_js', [], $locale));
@@ -215,7 +216,10 @@ class BudgetController extends Controller
         if ($budgetLimit instanceof BudgetLimit) {
             $start = $budgetLimit->start_date;
             $end   = $budgetLimit->end_date;
-            $collector->setRange($budgetLimit->start_date, $budgetLimit->end_date)->setNormalCurrency($budgetLimit->transactionCurrency);
+            $collector->setRange($budgetLimit->start_date, $budgetLimit->end_date);
+            if (!$this->convertToPrimary) {
+                $collector->setNormalCurrency($budgetLimit->transactionCurrency);
+            }
         }
         $cache->addProperty($start);
         $cache->addProperty($end);
@@ -297,7 +301,9 @@ class BudgetController extends Controller
         if ($budgetLimit instanceof BudgetLimit) {
             $start = $budgetLimit->start_date;
             $end   = $budgetLimit->end_date;
-            $collector->setNormalCurrency($budgetLimit->transactionCurrency);
+            if (!$this->convertToPrimary) {
+                $collector->setNormalCurrency($budgetLimit->transactionCurrency);
+            }
         }
         $cache->addProperty($start);
         $cache->addProperty($end);
@@ -379,7 +385,10 @@ class BudgetController extends Controller
         if ($budgetLimit instanceof BudgetLimit) {
             $start = $budgetLimit->start_date;
             $end   = $budgetLimit->end_date;
-            $collector->setRange($budgetLimit->start_date, $budgetLimit->end_date)->setNormalCurrency($budgetLimit->transactionCurrency);
+            $collector->setRange($budgetLimit->start_date, $budgetLimit->end_date);
+            if (!$this->convertToPrimary) {
+                $collector->setNormalCurrency($budgetLimit->transactionCurrency);
+            }
         }
         $cache->addProperty($start);
         $cache->addProperty($end);

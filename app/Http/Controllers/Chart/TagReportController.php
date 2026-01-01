@@ -42,8 +42,8 @@ use Illuminate\Support\Collection;
 class TagReportController extends Controller
 {
     use AugumentData;
-    use TransactionCalculation;
     use HasCharts;
+    use TransactionCalculation;
 
     private GeneratorInterface $generator;
     private OperationsRepositoryInterface $opsRepository;
@@ -56,7 +56,7 @@ class TagReportController extends Controller
         parent::__construct();
         $this->middleware(
             function ($request, $next) {
-                $this->generator = app(GeneratorInterface::class);
+                $this->generator     = app(GeneratorInterface::class);
                 $this->opsRepository = app(OperationsRepositoryInterface::class);
 
                 return $next($request);
@@ -71,6 +71,7 @@ class TagReportController extends Controller
         $data      = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($spent, 'tags', $getBudget)
             : $this->formatPieChartMultiCurrency($spent, 'tags', $getBudget);
+
         return response()->json($data);
     }
 
@@ -81,6 +82,7 @@ class TagReportController extends Controller
         $data        = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($spent, 'tags', $getCategory)
             : $this->formatPieChartMultiCurrency($spent, 'tags', $getCategory);
+
         return response()->json($data);
     }
 
@@ -91,6 +93,7 @@ class TagReportController extends Controller
         $data        = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($earned, 'tags', $getCategory)
             : $this->formatPieChartMultiCurrency($earned, 'tags', $getCategory);
+
         return response()->json($data);
     }
 
@@ -101,6 +104,7 @@ class TagReportController extends Controller
         $data           = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($spent, 'tags', $getDestination)
             : $this->formatPieChartMultiCurrency($spent, 'tags', $getDestination);
+
         return response()->json($data);
     }
 
@@ -111,6 +115,7 @@ class TagReportController extends Controller
         $data           = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($earned, 'tags', $getDestination)
             : $this->formatPieChartMultiCurrency($earned, 'tags', $getDestination);
+
         return response()->json($data);
     }
 
@@ -210,6 +215,7 @@ class TagReportController extends Controller
         $data      = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($spent, 'tags', $getSource)
             : $this->formatPieChartMultiCurrency($spent, 'tags', $getSource);
+
         return response()->json($data);
     }
 
@@ -220,6 +226,7 @@ class TagReportController extends Controller
         $data      = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($earned, 'tags', $getSource)
             : $this->formatPieChartMultiCurrency($earned, 'tags', $getSource);
+
         return response()->json($data);
     }
 
@@ -230,6 +237,7 @@ class TagReportController extends Controller
         $data   = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($spent, 'tags', $getTag)
             : $this->formatPieChartMultiCurrency($spent, 'tags', $getTag);
+
         return response()->json($data);
     }
 
@@ -240,6 +248,7 @@ class TagReportController extends Controller
         $data   = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($earned, 'tags', $getTag)
             : $this->formatPieChartMultiCurrency($earned, 'tags', $getTag);
+
         return response()->json($data);
     }
 }

@@ -29,10 +29,8 @@ use FireflyIII\Enums\TransactionTypeEnum;
 use FireflyIII\Generator\Chart\Basic\GeneratorInterface;
 use FireflyIII\Helpers\Collector\GroupCollectorInterface;
 use FireflyIII\Http\Controllers\Controller;
-use FireflyIII\Repositories\Currency\CurrencyRepositoryInterface;
 use FireflyIII\Support\CacheProperties;
 use FireflyIII\Support\Facades\Steam;
-use FireflyIII\Support\Http\Api\ExchangeRateConverter;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -42,7 +40,6 @@ use Symfony\Component\HttpFoundation\Request;
 class TransactionController extends Controller
 {
     private GeneratorInterface $generator;
-    private CurrencyRepositoryInterface $currencyRepository;
 
     /**
      * TransactionController constructor.
@@ -53,7 +50,6 @@ class TransactionController extends Controller
         $this->middleware(
             function (Request $request, $next) {
                 $this->generator = app(GeneratorInterface::class);
-                $this->currencyRepository = app(CurrencyRepositoryInterface::class);
 
                 return $next($request);
             }
@@ -79,7 +75,7 @@ class TransactionController extends Controller
         $collector->withBudgetInformation();
         $collector->setTypes([TransactionTypeEnum::WITHDRAWAL->value]);
 
-        $result = $collector->getExtractedJournals();
+        $result    = $collector->getExtractedJournals();
 
         $getBudget = fn (array $journal) => $journal['budget_name'] ?? (string) trans('firefly.no_budget');
         $chart     = $this->convertToPrimary
@@ -96,7 +92,7 @@ class TransactionController extends Controller
      */
     public function categories(string $objectType, Carbon $start, Carbon $end)
     {
-        $cache     = new CacheProperties();
+        $cache       = new CacheProperties();
         $cache->addProperty($start);
         $cache->addProperty($end);
         $cache->addProperty($objectType);
@@ -106,7 +102,7 @@ class TransactionController extends Controller
         }
 
         /** @var GroupCollectorInterface $collector */
-        $collector = app(GroupCollectorInterface::class);
+        $collector   = app(GroupCollectorInterface::class);
         $collector->setRange($start, $end);
         $collector->withCategoryInformation();
 
@@ -120,7 +116,7 @@ class TransactionController extends Controller
             $collector->setTypes([TransactionTypeEnum::TRANSFER->value]);
         }
 
-        $result = $collector->getExtractedJournals();
+        $result      = $collector->getExtractedJournals();
 
         $getCategory = fn (array $journal) => $journal['category_name'] ?? (string) trans('firefly.no_category');
         $chart       = $this->convertToPrimary
@@ -137,7 +133,7 @@ class TransactionController extends Controller
      */
     public function destinationAccounts(string $objectType, Carbon $start, Carbon $end)
     {
-        $cache     = new CacheProperties();
+        $cache          = new CacheProperties();
         $cache->addProperty($start);
         $cache->addProperty($end);
         $cache->addProperty($objectType);
@@ -147,7 +143,7 @@ class TransactionController extends Controller
         }
 
         /** @var GroupCollectorInterface $collector */
-        $collector = app(GroupCollectorInterface::class);
+        $collector      = app(GroupCollectorInterface::class);
         $collector->setRange($start, $end);
         $collector->withAccountInformation();
 
@@ -161,7 +157,7 @@ class TransactionController extends Controller
             $collector->setTypes([TransactionTypeEnum::TRANSFER->value]);
         }
 
-        $result = $collector->getExtractedJournals();
+        $result         = $collector->getExtractedJournals();
 
         $getDestination = fn (array $journal) => $journal['destination_account_name'];
         $chart          = $this->convertToPrimary
@@ -202,7 +198,7 @@ class TransactionController extends Controller
             $collector->setTypes([TransactionTypeEnum::TRANSFER->value]);
         }
 
-        $result = $collector->getExtractedJournals();
+        $result    = $collector->getExtractedJournals();
 
         $getSource = fn (array $journal) => $journal['source_account_name'];
         $chart     = $this->convertToPrimary
@@ -216,51 +212,44 @@ class TransactionController extends Controller
 
     private function formatPieChartMultiCurrency(array $transactions, callable $getTitle): array
     {
-        $result = [];
-
-        // loop expenses.
-        foreach ($transactions as $journal) {
-            $title = sprintf('%s (%s)', $getTitle($journal), $journal['currency_symbol']);
-            $result[$title] ??= [
-                'amount'          => '0',
-                'currency_symbol' => $journal['currency_symbol'],
-                'currency_code'   => $journal['currency_code'],
-            ];
-
-            $amount                   = Steam::positive($journal['amount']);
-            $result[$title]['amount'] = bcadd($result[$title]['amount'], $amount);
-        }
-
-        return $this->generator->multiCurrencyPieChart($result);
+        return $this->formatPieChart(
+            $transactions,
+            fn (array $journal) => sprintf('%s (%s)', $getTitle($journal), $journal['currency_symbol']),
+            fn (array $journal) => [$journal['currency_symbol'], $journal['currency_code']],
+            fn (array $journal) => $journal['amount'],
+        );
     }
 
     private function formatPieChartPrimaryCurrency(array $transactions, callable $getTitle): array
     {
-        $converter  = new ExchangeRateConverter();
-        $currencies = $this->currencyRepository->get()->keyBy('id');
+        return $this->formatPieChart(
+            $transactions,
+            $getTitle,
+            fn ()               => [$this->primaryCurrency->symbol, $this->primaryCurrency->code],
+            fn (array $journal) => match ($this->primaryCurrency->id) {
+                $journal['currency_id']         => $journal['amount'],
+                $journal['foreign_currency_id'] => $journal['foreign_amount'],
+                default                         => $journal['pc_amount'],
+            },
+        );
+    }
 
-        $amountByTitleByCurrency = [];
-        foreach ($transactions as $journal) {
-            $title  = $getTitle($journal);
-            $amount = Steam::positive($journal['amount']);
-            $amountByTitleByCurrency[$title][$journal['currency_id']]
-                = bcadd($amountByTitleByCurrency[$title][$journal['currency_id']] ?? '0', $amount);
-        }
-
+    private function formatPieChart(array $transactions, callable $getTitle, callable $getCurrency, callable $getAmount): array
+    {
         $result = [];
-        foreach ($amountByTitleByCurrency as $title => $amountByCurrency) {
+
+        // loop expenses.
+        foreach ($transactions as $journal) {
+            [$symbol, $code]          = $getCurrency($journal);
+            $title                    = $getTitle($journal);
             $result[$title] ??= [
                 'amount'          => '0',
-                'currency_symbol' => $this->primaryCurrency->symbol,
-                'currency_code'   => $this->primaryCurrency->code,
+                'currency_symbol' => $symbol,
+                'currency_code'   => $code,
             ];
 
-            foreach ($amountByCurrency as $currencyId => $amount) {
-                $originalCurrency = $currencies[$currencyId];
-
-                $amountPC = $converter->convert($originalCurrency, $this->primaryCurrency, Carbon::now(), $amount);
-                $result[$title]['amount'] = bcadd($result[$title]['amount'], $amountPC);
-            }
+            $amount                   = Steam::positive($getAmount($journal));
+            $result[$title]['amount'] = bcadd($result[$title]['amount'], $amount);
         }
 
         return $this->generator->multiCurrencyPieChart($result);

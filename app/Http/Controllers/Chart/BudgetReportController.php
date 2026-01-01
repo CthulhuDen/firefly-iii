@@ -45,8 +45,8 @@ use Illuminate\Support\Collection;
 class BudgetReportController extends Controller
 {
     use AugumentData;
-    use TransactionCalculation;
     use HasCharts;
+    use TransactionCalculation;
 
     private GeneratorInterface $generator;
     private OperationsRepositoryInterface $opsRepository;
@@ -77,6 +77,7 @@ class BudgetReportController extends Controller
         $data      = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($spent, 'budgets', $getBudget)
             : $this->formatPieChartMultiCurrency($spent, 'budgets', $getBudget);
+
         return response()->json($data);
     }
 
@@ -90,6 +91,7 @@ class BudgetReportController extends Controller
         $data        = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($spent, 'budgets', $getCategory)
             : $this->formatPieChartMultiCurrency($spent, 'budgets', $getCategory);
+
         return response()->json($data);
     }
 
@@ -103,6 +105,7 @@ class BudgetReportController extends Controller
         $data           = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($spent, 'budgets', $getDestination)
             : $this->formatPieChartMultiCurrency($spent, 'budgets', $getDestination);
+
         return response()->json($data);
     }
 
@@ -174,6 +177,7 @@ class BudgetReportController extends Controller
         $data      = $this->convertToPrimary
             ? $this->formatPieChartPrimaryCurrency($spent, 'budgets', $getSource)
             : $this->formatPieChartMultiCurrency($spent, 'budgets', $getSource);
+
         return response()->json($data);
     }
 }

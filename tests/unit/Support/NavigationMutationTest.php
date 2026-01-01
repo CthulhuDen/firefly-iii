@@ -33,6 +33,10 @@ use Tests\integration\TestCase;
  * @group unit-test
  * @group support
  * @group navigation
+ *
+ * @internal
+ *
+ * @coversNothing
  */
 final class NavigationMutationTest extends TestCase
 {
@@ -70,7 +74,7 @@ final class NavigationMutationTest extends TestCase
             '1Y', 'year', 'yearly',
             'custom',
             'last7', 'last30', 'last90', 'last365',
-            'MTD', 'QTD', 'YTD'
+            'MTD', 'QTD', 'YTD',
         ];
 
         foreach ($frequencies as $frequency) {

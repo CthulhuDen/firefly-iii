@@ -767,7 +767,7 @@ class GroupCollector implements GroupCollectorInterface
                         $groups[$groudId]['sums'][$currencyId]['pc_amount']               = '0';
                     }
                     $groups[$groudId]['sums'][$currencyId]['amount']    = bcadd((string)$groups[$groudId]['sums'][$currencyId]['amount'], $foreignAmount);
-                    $groups[$groudId]['sums'][$currencyId]['pc_amount'] = bcadd($groups[$groudId]['sums'][$currencyId]['amount'], $pcForeignAmount);
+                    $groups[$groudId]['sums'][$currencyId]['pc_amount'] = bcadd((string)$groups[$groudId]['sums'][$currencyId]['pc_amount'], $pcForeignAmount);
                 }
             }
         }

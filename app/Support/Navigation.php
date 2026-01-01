@@ -200,7 +200,7 @@ class Navigation
 
     public function endOfPeriod(Carbon $end, string $repeatFreq): Carbon
     {
-        $currentEnd  = clone $end;
+        $currentEnd    = clone $end;
 
         // Log::debug(sprintf('Now in endOfPeriod("%s", "%s").', $currentEnd->toIso8601String(), $repeatFreq));
         if ('MTD' === $repeatFreq && $end->isFuture()) {
@@ -219,7 +219,7 @@ class Navigation
             $repeatFreq = '3M';
         }
 
-        $functionMap = [
+        $functionMap   = [
             '1D'        => 'endOfDay',
             'daily'     => 'endOfDay',
             '1W'        => 'addWeek',
@@ -238,8 +238,8 @@ class Navigation
             'yearly'    => 'addYear',
             '1Y'        => 'addYear',
         ];
-        $modifierMap = ['half-year' => 6, 'half_year' => 6, '6M' => 6];
-        $subDay      = ['week', 'weekly', '1W', 'month', 'monthly', '1M', '3M', 'quarter', 'quarterly', '6M', 'half-year', 'half_year', '1Y', 'year', 'yearly'];
+        $modifierMap   = ['half-year' => 6, 'half_year' => 6, '6M' => 6];
+        $subDay        = ['week', 'weekly', '1W', 'month', 'monthly', '1M', '3M', 'quarter', 'quarterly', '6M', 'half-year', 'half_year', '1Y', 'year', 'yearly'];
 
         if ('custom' === $repeatFreq) {
             // if the repeat frequency is "custom", use the current session start/end to see how large the range is,
@@ -297,7 +297,7 @@ class Navigation
             return $currentEnd;
         }
 
-        $result      = match ($repeatFreq) {
+        $result        = match ($repeatFreq) {
             'last7'   => $currentEnd->addDays(7)->startOfDay(),
             'last30'  => $currentEnd->addDays(30)->startOfDay(),
             'last90'  => $currentEnd->addDays(90)->startOfDay(),
@@ -324,7 +324,7 @@ class Navigation
 
             return $end;
         }
-        $function    = $functionMap[$repeatFreq];
+        $function      = $functionMap[$repeatFreq];
 
         if (array_key_exists($repeatFreq, $modifierMap)) {
             $currentEnd->{$function}($modifierMap[$repeatFreq])->milli(0); // @phpstan-ignore-line

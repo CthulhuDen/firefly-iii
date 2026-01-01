@@ -467,7 +467,7 @@ class BasicController extends Controller
         $today      = today(config('app.timezone'));
         $available  = $this->abRepository->getAvailableBudgetWithCurrency($start, $end);
         $budgets    = $this->budgetRepository->getActiveBudgets();
-        $spent      = $this->opsRepository->sumExpenses($start, $end, null, $budgets);
+        $spent      = $this->opsRepository->sumExpenses($start, $end, null, $budgets, null, $this->convertToPrimary);
         $days       = (int) $today->diffInDays($end, true) + 1;
         $currencies = [];
 
@@ -524,7 +524,7 @@ class BasicController extends Controller
         if (0 === count($return)) {
             $days  = (int) $start->diffInDays($end, true) + 1;
             // a small trick to get every expense in this period, regardless of budget.
-            $spent = $this->opsRepository->sumExpenses($start, $end, null, new Collection());
+            $spent = $this->opsRepository->sumExpenses($start, $end, null, new Collection(), null, $this->convertToPrimary);
             foreach ($spent as $row) {
                 // either an amount was budgeted or 0 is available.
                 $currencyId          = (int) $row['currency_id'];

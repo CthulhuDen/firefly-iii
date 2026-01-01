@@ -171,27 +171,27 @@ class FrontpageChartGenerator
      */
     private function processLimit(array $data, Budget $budget, BudgetLimit $limit): array
     {
-        $usePrimary = $this->convertToPrimary && $this->default->id !== $limit->transaction_currency_id;
-        $currency   = $limit->transactionCurrency;
-        if ($usePrimary) {
+        $currency = $limit->transactionCurrency;
+        if ($this->convertToPrimary) {
+            $currency = null;
             Log::debug(sprintf('Processing limit #%d with (primary currency) %s %s', $limit->id, $this->default->code, $limit->native_amount));
         }
-        if (!$usePrimary) {
+        if (!$this->convertToPrimary) {
             Log::debug(sprintf('Processing limit #%d with %s %s', $limit->id, $limit->transactionCurrency->code, $limit->amount));
         }
 
-        $spent      = $this->opsRepository->sumExpenses($limit->start_date, $limit->end_date, null, new Collection()->push($budget), $currency);
+        $spent    = $this->opsRepository->sumExpenses($limit->start_date, $limit->end_date, null, new Collection()->push($budget), $currency, $this->convertToPrimary);
         Log::debug(sprintf('Spent array has %d entries.', count($spent)));
 
         /** @var array $entry */
         foreach ($spent as $entry) {
             // only spent the entry where the entry's currency matches the budget limit's currency
             // or when usePrimary is true.
-            if ($entry['currency_id'] === $limit->transaction_currency_id || $usePrimary) {
+            if ($entry['currency_id'] === $limit->transaction_currency_id || $this->convertToPrimary) {
                 Log::debug(sprintf('Process spent row (%s)', $entry['currency_code']));
                 $data = $this->processRow($data, $budget, $limit, $entry);
             }
-            if ($entry['currency_id'] !== $limit->transaction_currency_id && !$usePrimary) {
+            if ($entry['currency_id'] !== $limit->transaction_currency_id && !$this->convertToPrimary) {
                 Log::debug(sprintf('Skipping spent row (%s).', $entry['currency_code']));
             }
         }
@@ -207,17 +207,30 @@ class FrontpageChartGenerator
      */
     private function processRow(array $data, Budget $budget, BudgetLimit $limit, array $entry): array
     {
-        $title                      = sprintf('%s (%s)', $budget->name, $entry['currency_name']);
-        Log::debug(sprintf('Title is "%s"', $title));
-        if ($limit->start_date->startOfDay()->ne($this->start->startOfDay()) || $limit->end_date->startOfDay()->ne($this->end->startOfDay())) {
-            $title = sprintf(
-                '%s (%s) (%s - %s)',
-                $budget->name,
-                $entry['currency_name'],
-                $limit->start_date->isoFormat($this->monthAndDayFormat),
-                $limit->end_date->isoFormat($this->monthAndDayFormat)
-            );
+        if ($this->convertToPrimary) {
+            $title = $budget->name;
+            if ($limit->start_date->startOfDay()->ne($this->start->startOfDay()) || $limit->end_date->startOfDay()->ne($this->end->startOfDay())) {
+                $title = sprintf(
+                    '%s (%s - %s)',
+                    $budget->name,
+                    $limit->start_date->isoFormat($this->monthAndDayFormat),
+                    $limit->end_date->isoFormat($this->monthAndDayFormat)
+                );
+            }
+        } else {
+            $title = sprintf('%s (%s)', $budget->name, $entry['currency_name']);
+            if ($limit->start_date->startOfDay()->ne($this->start->startOfDay()) || $limit->end_date->startOfDay()->ne($this->end->startOfDay())) {
+                $title = sprintf(
+                    '%s (%s) (%s - %s)',
+                    $budget->name,
+                    $entry['currency_name'],
+                    $limit->start_date->isoFormat($this->monthAndDayFormat),
+                    $limit->end_date->isoFormat($this->monthAndDayFormat)
+                );
+            }
         }
+        Log::debug(sprintf('Title is "%s"', $title));
+
         $usePrimary                 = $this->convertToPrimary && $this->default->id !== $limit->transaction_currency_id;
         $amount                     = $limit->amount;
         Log::debug(sprintf('Amount is "%s".', $amount));
