@@ -97,6 +97,9 @@ Code style and quality are enforced via `php-cs-fixer` and `phpstan`.
 
 ## 4. Agent Protocols
 
+### Critical Restrictions
+**Dependency Management:** Do NOT update dependencies. Do NOT run `composer update`. Do NOT commit changes to `composer.lock` or `package-lock.json` unless explicitly instructed.
+
 ### Commit & PR Instructions
 When creating commits or Pull Requests, you must adhere to the following strict rules:
 
