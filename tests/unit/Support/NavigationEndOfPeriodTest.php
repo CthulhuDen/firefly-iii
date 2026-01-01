@@ -102,9 +102,9 @@ final class NavigationEndOfPeriodTest extends TestCase
         yield 'MTD' => ['MTD', Carbon::now(),
             Carbon::now()->isSameMonth(Carbon::now()) ? Carbon::now()->endOfDay() : Carbon::now()->endOfMonth()];
 
-        yield 'QTD' => ['QTD', Carbon::now(), Carbon::now()->firstOfQuarter()->startOfDay()];
+        yield 'QTD' => ['QTD', Carbon::now(), Carbon::now()->endOfDay()];
 
-        yield 'YTD' => ['YTD', Carbon::now(), Carbon::now()->firstOfYear()->startOfDay()];
+        yield 'YTD' => ['YTD', Carbon::now(), Carbon::now()->endOfDay()];
 
         yield 'week 2023-08-05 to 2023-08-11' => ['1W', Carbon::parse('2023-08-05'), Carbon::parse('2023-08-11')->endOfDay()];
     }

@@ -213,6 +213,11 @@ class Navigation
             Log::debug('endOfPeriod() requests "YTD" + future, set it to "1Y" instead.');
             $repeatFreq = '1Y';
         }
+        if ('QTD' === $repeatFreq && $end->isFuture()) {
+            // fall back to a quarterly schedule if the requested period is QTD.
+            Log::debug('endOfPeriod() requests "QTD" + future, set it to "3M" instead.');
+            $repeatFreq = '3M';
+        }
 
         $functionMap = [
             '1D'        => 'endOfDay',
@@ -261,24 +266,35 @@ class Navigation
 
             return $currentEnd;
         }
-        if ('MTD' === $repeatFreq) {
-            $today = today();
-            if ($today->isSameMonth($end)) {
+
+        $dynamicRanges = [
+            'MTD' => ['check' => 'isSameMonth', 'method' => 'endOfMonth'],
+            'QTD' => ['check' => 'isSameQuarter', 'method' => 'endOfQuarter'],
+            'YTD' => ['check' => 'isSameYear', 'method' => 'endOfYear'],
+        ];
+
+        if (array_key_exists($repeatFreq, $dynamicRanges)) {
+            $config = $dynamicRanges[$repeatFreq];
+            $today  = today();
+
+            if ($today->{$config['check']}($end)) {
                 $res = $today->endOfDay()->milli(0);
                 // add sanity check.
                 if ($res->lt($end)) {
-                    throw new FireflyException(sprintf('[b] endOfPeriod(%s, %s) failed, because it resulted in %s.', $end->toW3cString(), $repeatFreq, $res->toW3cString()));
+                    throw new FireflyException(sprintf('[z] endOfPeriod(%s, %s) failed, because it resulted in %s.', $end->toW3cString(), $repeatFreq, $res->toW3cString()));
                 }
 
                 return $res;
             }
 
+            $currentEnd->{$config['method']}()->milli(0);
+
             // add sanity check.
             if ($currentEnd->lt($end)) {
-                throw new FireflyException(sprintf('[c] endOfPeriod(%s, %s) failed, because it resulted in %s.', $end->toW3cString(), $repeatFreq, $currentEnd->toW3cString()));
+                throw new FireflyException(sprintf('[x] endOfPeriod(%s, %s) failed, because it resulted in %s.', $end->toW3cString(), $repeatFreq, $currentEnd->toW3cString()));
             }
 
-            return $end->endOfMonth();
+            return $currentEnd;
         }
 
         $result      = match ($repeatFreq) {
@@ -286,9 +302,6 @@ class Navigation
             'last30'  => $currentEnd->addDays(30)->startOfDay(),
             'last90'  => $currentEnd->addDays(90)->startOfDay(),
             'last365' => $currentEnd->addDays(365)->startOfDay(),
-            'MTD'     => $currentEnd->startOfMonth()->startOfDay(),
-            'QTD'     => $currentEnd->firstOfQuarter()->startOfDay(),
-            'YTD'     => $currentEnd->startOfYear()->startOfDay(),
             default   => null,
         };
         if (null !== $result) {
@@ -353,9 +366,9 @@ class Navigation
             'month'     => 'endOfMonth',
             '1M'        => 'endOfMonth',
             'monthly'   => 'endOfMonth',
-            '3M'        => 'lastOfQuarter',
-            'quarter'   => 'lastOfQuarter',
-            'quarterly' => 'lastOfQuarter',
+            '3M'        => 'endOfQuarter',
+            'quarter'   => 'endOfQuarter',
+            'quarterly' => 'endOfQuarter',
             '1Y'        => 'endOfYear',
             'year'      => 'endOfYear',
             'yearly'    => 'endOfYear',
@@ -788,7 +801,7 @@ class Navigation
             '1D'     => 'endOfDay',
             '1W'     => 'endOfWeek',
             '1M'     => 'endOfMonth',
-            '3M'     => 'lastOfQuarter',
+            '3M'     => 'endOfQuarter',
             'custom' => 'startOfMonth', // this only happens in test situations.
         ];
         $end         = clone $start;
