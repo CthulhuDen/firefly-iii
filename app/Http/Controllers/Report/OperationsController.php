@@ -66,6 +66,8 @@ class OperationsController extends Controller
      */
     public function expenses(Collection $accounts, Carbon $start, Carbon $end)
     {
+        $accounts = $accounts->sortBy('order');
+
         // chart properties for cache:
         $cache  = new CacheProperties();
         $cache->addProperty($start);
@@ -100,6 +102,8 @@ class OperationsController extends Controller
      */
     public function income(Collection $accounts, Carbon $start, Carbon $end): string
     {
+        $accounts = $accounts->sortBy('order');
+
         // chart properties for cache:
         $cache  = new CacheProperties();
         $cache->addProperty($start);
@@ -167,8 +171,23 @@ class OperationsController extends Controller
             $sums[$currencyId]['sum'] = bcadd($sums[$currencyId]['in'], $sums[$currencyId]['out']);
         }
 
+        $primaryCurrency = app('amount')->getPrimaryCurrencyByUserGroup(auth()->user()->userGroup);
+
+        ksort($sums);
+        if (isset($sums[$primaryCurrency->id])) {
+            $primarySum = $sums[$primaryCurrency->id];
+            unset($sums[$primaryCurrency->id]);
+
+            $sums = [$primaryCurrency->id => $primarySum] + $sums;
+        }
+
+        $sum = $incomes['sum'];
+        $sum['in'] = $sum['sum'];
+        $sum['out'] = $expenses['sum']['sum'];
+        $sum['sum'] = bcadd($sum['in'], $sum['out']);
+
         try {
-            $result = view('reports.partials.operations', ['sums' => $sums])->render();
+            $result = view('reports.partials.operations', ['sums' => $sums, 'sum' => $sum])->render();
         } catch (Throwable $e) {
             Log::error(sprintf('Could not render reports.partials.operations: %s', $e->getMessage()));
             Log::error($e->getTraceAsString());

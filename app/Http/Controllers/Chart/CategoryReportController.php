@@ -130,24 +130,43 @@ class CategoryReportController extends Controller
         // loop expenses.
         foreach ($spent as $currency) {
             // add things to chart Data for each currency:
-            $spentKey = sprintf('%d-spent', $currency['currency_id']);
+            $spentKey    = sprintf('%d-spent', $currency['currency_id']);
+            $amountField = 'amount';
+
+            if ($this->convertToPrimary) {
+                $spentKey    = 'spent';
+                $amountField = (int) $currency['currency_id'] === $this->primaryCurrency->id
+                    ? 'amount'
+                    : 'pc_amount';
+
+                $currency['currency_id']             = $this->primaryCurrency->id;
+                $currency['currency_symbol']         = $this->primaryCurrency->symbol;
+                $currency['currency_code']           = $this->primaryCurrency->code;
+                $currency['currency_name']           = $this->primaryCurrency->name;
+                $currency['currency_decimal_places'] = $this->primaryCurrency->decimal_places;
+            }
+
             $chartData[$spentKey] ??= [
-                'label'           => sprintf(
-                    '%s (%s)',
-                    (string) trans('firefly.spent_in_specific_category', ['category' => $category->name]),
-                    $currency['currency_name']
-                ),
-                'type'            => 'bar',
-                'currency_symbol' => $currency['currency_symbol'],
-                'currency_code'   => $currency['currency_code'],
-                'currency_id'     => $currency['currency_id'],
-                'entries'         => $this->makeEntries($start, $end),
+                'label'                   => $this->convertToPrimary
+                                                ? trans('firefly.spent_in_specific_category', ['category' => $category->name])
+                                                : sprintf(
+                                                    '%s (%s)',
+                                                    trans('firefly.spent_in_specific_category', ['category' => $category->name]),
+                                                    $currency['currency_name']
+                                                ),
+                'type'                    => 'bar',
+                'currency_id'             => $currency['currency_id'],
+                'currency_symbol'         => $currency['currency_symbol'],
+                'currency_code'           => $currency['currency_code'],
+                'currency_name'           => $currency['currency_name'],
+                'currency_decimal_places' => $currency['currency_decimal_places'],
+                'entries'                 => $this->makeEntries($start, $end),
             ];
 
             foreach ($currency['categories'] as $currentCategory) {
                 foreach ($currentCategory['transaction_journals'] as $journal) {
                     $key                                   = $journal['date']->isoFormat($format);
-                    $amount                                = Steam::positive($journal['amount']);
+                    $amount                                = Steam::positive($journal[$amountField]);
                     $chartData[$spentKey]['entries'][$key] ??= '0';
                     $chartData[$spentKey]['entries'][$key] = bcadd($chartData[$spentKey]['entries'][$key], $amount);
                 }
@@ -157,31 +176,50 @@ class CategoryReportController extends Controller
         // loop income.
         foreach ($earned as $currency) {
             // add things to chart Data for each currency:
-            $spentKey = sprintf('%d-earned', $currency['currency_id']);
+            $spentKey    = sprintf('%d-earned', $currency['currency_id']);
+            $amountField = 'amount';
+
+            if ($this->convertToPrimary) {
+                $spentKey    = 'earned';
+                $amountField = (int) $currency['currency_id'] === $this->primaryCurrency->id
+                    ? 'amount'
+                    : 'pc_amount';
+
+                $currency['currency_id']             = $this->primaryCurrency->id;
+                $currency['currency_symbol']         = $this->primaryCurrency->symbol;
+                $currency['currency_code']           = $this->primaryCurrency->code;
+                $currency['currency_name']           = $this->primaryCurrency->name;
+                $currency['currency_decimal_places'] = $this->primaryCurrency->decimal_places;
+            }
+
             $chartData[$spentKey] ??= [
-                'label'           => sprintf(
-                    '%s (%s)',
-                    (string) trans('firefly.earned_in_specific_category', ['category' => $category->name]),
-                    $currency['currency_name']
-                ),
-                'type'            => 'bar',
-                'currency_symbol' => $currency['currency_symbol'],
-                'currency_code'   => $currency['currency_code'],
-                'currency_id'     => $currency['currency_id'],
-                'entries'         => $this->makeEntries($start, $end),
+                'label'                   => $this->convertToPrimary
+                                                ? trans('firefly.earned_in_specific_category', ['category' => $category->name])
+                                                : sprintf(
+                                                    '%s (%s)',
+                                                    trans('firefly.earned_in_specific_category', ['category' => $category->name]),
+                                                    $currency['currency_name']
+                                                ),
+                'type'                    => 'bar',
+                'currency_id'             => $currency['currency_id'],
+                'currency_symbol'         => $currency['currency_symbol'],
+                'currency_code'           => $currency['currency_code'],
+                'currency_name'           => $currency['currency_name'],
+                'currency_decimal_places' => $currency['currency_decimal_places'],
+                'entries'                 => $this->makeEntries($start, $end),
             ];
 
             foreach ($currency['categories'] as $currentCategory) {
                 foreach ($currentCategory['transaction_journals'] as $journal) {
                     $key                                   = $journal['date']->isoFormat($format);
-                    $amount                                = Steam::positive($journal['amount']);
+                    $amount                                = Steam::positive($journal[$amountField]);
                     $chartData[$spentKey]['entries'][$key] ??= '0';
                     $chartData[$spentKey]['entries'][$key] = bcadd($chartData[$spentKey]['entries'][$key], $amount);
                 }
             }
         }
 
-        $data      = $this->generator->multiSet($chartData);
+        $data = $this->generator->multiSet($chartData);
 
         return response()->json($data);
     }

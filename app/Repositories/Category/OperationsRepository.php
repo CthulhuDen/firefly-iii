@@ -101,6 +101,9 @@ class OperationsRepository implements OperationsRepositoryInterface, UserGroupIn
             $journalId                                                                         = (int) $journal['transaction_journal_id'];
             $array[$currencyId]['categories'][$categoryId]['transaction_journals'][$journalId] = [
                 'amount'                   => app('steam')->negative($journal['amount']),
+                'pc_amount'                => empty($journal['pc_amount'])
+                                                ? ($journal['pc_amount'] ?? null)
+                                                : app('steam')->negative($journal['pc_amount']),
                 'date'                     => $journal['date'],
                 'source_account_id'        => (string) $journal['source_account_id'],
                 'budget_name'              => $journal['budget_name'],
@@ -179,6 +182,9 @@ class OperationsRepository implements OperationsRepositoryInterface, UserGroupIn
             $journalId                                                                         = (int) $journal['transaction_journal_id'];
             $array[$currencyId]['categories'][$categoryId]['transaction_journals'][$journalId] = [
                 'amount'                   => app('steam')->positive($journal['amount']),
+                'pc_amount'                => empty($journal['pc_amount'])
+                                                ? ($journal['pc_amount'] ?? null)
+                                                : app('steam')->positive($journal['pc_amount']),
                 'date'                     => $journal['date'],
                 'source_account_id'        => (string) $journal['source_account_id'],
                 'destination_account_id'   => (string) $journal['destination_account_id'],
@@ -241,6 +247,9 @@ class OperationsRepository implements OperationsRepositoryInterface, UserGroupIn
             $journalId                                                                         = (int) $journal['transaction_journal_id'];
             $array[$currencyId]['categories'][$categoryId]['transaction_journals'][$journalId] = [
                 'amount'                   => app('steam')->positive($journal['amount']),
+                'pc_amount'                => empty($journal['pc_amount'])
+                                                ? ($journal['pc_amount'] ?? null)
+                                                : app('steam')->positive($journal['pc_amount']),
                 'date'                     => $journal['date'],
                 'source_account_id'        => (string) $journal['source_account_id'],
                 'category_name'            => $journal['category_name'],
@@ -304,6 +313,9 @@ class OperationsRepository implements OperationsRepositoryInterface, UserGroupIn
             $journalId                                                                         = (int) $journal['transaction_journal_id'];
             $array[$currencyId]['categories'][$categoryId]['transaction_journals'][$journalId] = [
                 'amount'                   => app('steam')->negative($journal['amount']),
+                'pc_amount'                => empty($journal['pc_amount'])
+                                                ? ($journal['pc_amount'] ?? null)
+                                                : app('steam')->negative($journal['pc_amount']),
                 'date'                     => $journal['date'],
                 'source_account_id'        => (string) $journal['source_account_id'],
                 'category_name'            => $journal['category_name'],

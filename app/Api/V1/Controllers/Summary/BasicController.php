@@ -182,7 +182,9 @@ class BasicController extends Controller
             ];
             $return[] = [
                 'key'                     => sprintf('spent-in-%s', $currency->code),
-                'title'                   => trans('firefly.box_spent_in_currency', ['currency' => $currency->symbol]),
+                'title'                   => $this->convertToPrimary
+                    ? trans('firefly.spent')
+                    : trans('firefly.box_spent_in_currency', ['currency' => $currency->symbol]),
                 'monetary_value'          => $expenses[$currencyId]['sum'] ?? '0',
                 'currency_id'             => (string) $currency->id,
                 'currency_code'           => $currency->code,
@@ -194,7 +196,9 @@ class BasicController extends Controller
             ];
             $return[] = [
                 'key'                     => sprintf('earned-in-%s', $currency->code),
-                'title'                   => trans('firefly.box_earned_in_currency', ['currency' => $currency->symbol]),
+                'title'                   => $this->convertToPrimary
+                    ? trans('firefly.earned')
+                    : trans('firefly.box_earned_in_currency', ['currency' => $currency->symbol]),
                 'monetary_value'          => $incomes[$currencyId]['sum'] ?? '0',
                 'currency_id'             => (string) $currency->id,
                 'currency_code'           => $currency->code,
@@ -223,7 +227,9 @@ class BasicController extends Controller
             ];
             $return[] = [
                 'key'                     => sprintf('spent-in-%s', $currency->code),
-                'title'                   => trans('firefly.box_spent_in_currency', ['currency' => $currency->symbol]),
+                'title'                   => $this->convertToPrimary
+                    ? trans('firefly.spent')
+                    : trans('firefly.box_spent_in_currency', ['currency' => $currency->symbol]),
                 'monetary_value'          => '0',
                 'currency_id'             => (string) $currency->id,
                 'currency_code'           => $currency->code,
@@ -235,7 +241,9 @@ class BasicController extends Controller
             ];
             $return[] = [
                 'key'                     => sprintf('earned-in-%s', $currency->code),
-                'title'                   => trans('firefly.box_earned_in_currency', ['currency' => $currency->symbol]),
+                'title'                   => $this->convertToPrimary
+                    ? trans('firefly.earned')
+                    : trans('firefly.box_earned_in_currency', ['currency' => $currency->symbol]),
                 'monetary_value'          => '0',
                 'currency_id'             => (string) $currency->id,
                 'currency_code'           => $currency->code,

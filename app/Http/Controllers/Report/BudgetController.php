@@ -76,7 +76,7 @@ class BudgetController extends Controller
         $generator = app(BudgetReportGenerator::class);
 
         $generator->setUser(auth()->user());
-        $generator->setAccounts($accounts);
+        $generator->setAccounts($accounts->sortBy('order'));
         $generator->setBudgets($budgets);
         $generator->setStart($start);
         $generator->setEnd($end);
@@ -92,6 +92,8 @@ class BudgetController extends Controller
      */
     public function accounts(Collection $accounts, Collection $budgets, Carbon $start, Carbon $end): Factory|\Illuminate\Contracts\View\View
     {
+        $accounts = $accounts->sortBy('order');
+
         $spent  = $this->opsRepository->listExpenses($start, $end, $accounts, $budgets);
         $report = [];
         $sums   = [];

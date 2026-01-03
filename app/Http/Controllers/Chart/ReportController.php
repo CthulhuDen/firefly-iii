@@ -117,7 +117,9 @@ class ReportController extends Controller
                 $label                                     = $current->isoFormat((string) trans('config.month_and_day_js', [], $locale));
                 if (!array_key_exists($currencyId, $chartData)) {
                     $chartData[$currencyId] = [
-                        'label'           => 'Net worth in '.$netWorthItem['currency_name'],
+                        'label'           => $this->convertToPrimary
+                                                ? 'Net worth'
+                                                : 'Net worth in '.$netWorthItem['currency_name'],
                         'type'            => 'line',
                         'currency_symbol' => $netWorthItem['currency_symbol'],
                         'currency_code'   => $netWorthItem['currency_code'],
@@ -181,21 +183,37 @@ class ReportController extends Controller
         foreach ($journals as $journal) {
             $period                           = $journal['date']->format($format);
             $currencyId                       = (int) $journal['currency_id'];
-            $data[$currencyId]          ??= [
+            $amount                           = Steam::positive($journal['amount']);
+
+            $currencyData = [
                 'currency_id'             => $currencyId,
                 'currency_symbol'         => $journal['currency_symbol'],
                 'currency_code'           => $journal['currency_code'],
                 'currency_name'           => $journal['currency_name'],
                 'currency_decimal_places' => (int) $journal['currency_decimal_places'],
             ];
+
+            if ($this->convertToPrimary && $this->primaryCurrency->id !== $currencyId) {
+                $currencyId = $this->primaryCurrency->id;
+                $amount     = Steam::positive($journal['pc_amount']);
+
+                $currencyData = [
+                    'currency_id'             => $currencyId,
+                    'currency_symbol'         => $this->primaryCurrency->symbol,
+                    'currency_code'           => $this->primaryCurrency->code,
+                    'currency_name'           => $this->primaryCurrency->name,
+                    'currency_decimal_places' => (int) $this->primaryCurrency->decimal_places,
+                ];
+            }
+
+            $data[$currencyId]          ??= $currencyData;
             $data[$currencyId][$period] ??= [
                 'period' => $period,
                 'spent'  => '0',
                 'earned' => '0',
             ];
             // in our outgoing?
-            $key                              = 'spent';
-            $amount                           = Steam::positive($journal['amount']);
+            $key = 'spent';
 
             // deposit = incoming
             // transfer or reconcile or opening balance, and these accounts are the destination.
@@ -219,7 +237,9 @@ class ReportController extends Controller
         foreach ($data as $currency) {
             Log::debug(sprintf('Now processing currency "%s"', $currency['currency_name']));
             $income       = [
-                'label'           => (string) trans('firefly.box_earned_in_currency', ['currency' => $currency['currency_name']]),
+                'label'           => $this->convertToPrimary
+                    ? trans('firefly.earned')
+                    : trans('firefly.box_earned_in_currency', ['currency' => $currency['currency_name']]),
                 'type'            => 'bar',
                 'backgroundColor' => 'rgba(0, 141, 76, 0.5)', // green
                 'currency_id'     => $currency['currency_id'],
@@ -228,7 +248,9 @@ class ReportController extends Controller
                 'entries'         => [],
             ];
             $expense      = [
-                'label'           => (string) trans('firefly.box_spent_in_currency', ['currency' => $currency['currency_name']]),
+                'label'           => $this->convertToPrimary
+                    ? trans('firefly.spent')
+                    : trans('firefly.box_spent_in_currency', ['currency' => $currency['currency_name']]),
                 'type'            => 'bar',
                 'backgroundColor' => 'rgba(219, 68, 55, 0.5)', // red
                 'currency_id'     => $currency['currency_id'],

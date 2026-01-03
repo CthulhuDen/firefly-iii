@@ -25,8 +25,10 @@ declare(strict_types=1);
 namespace FireflyIII\Support\Report\Category;
 
 use Carbon\Carbon;
+use FireflyIII\Models\TransactionCurrency;
 use FireflyIII\Repositories\Category\NoCategoryRepositoryInterface;
 use FireflyIII\Repositories\Category\OperationsRepositoryInterface;
+use FireflyIII\Support\Facades\Steam;
 use FireflyIII\User;
 use Illuminate\Support\Collection;
 
@@ -72,15 +74,43 @@ class CategoryReportGenerator
         $earnedWithout  = $this->noCatRepository->listIncome($this->start, $this->end, $this->accounts);
         $spentWithout   = $this->noCatRepository->listExpenses($this->start, $this->end, $this->accounts);
 
+        $primaryCurrency  = app('amount')->getPrimaryCurrencyByUserGroup(auth()->user()->userGroup);
+        $convertToPrimary = app('amount')->convertToPrimary(auth()->user());
+
         $this->report   = [
             'categories' => [],
             'sums'       => [],
         ];
 
+        if ($convertToPrimary) {
+            $this->report['sums'][$primaryCurrency->id] ??= [
+                'spent'                   => '0',
+                'earned'                  => '0',
+                'sum'                     => '0',
+                'currency_id'             => $primaryCurrency->id,
+                'currency_symbol'         => $primaryCurrency->symbol,
+                'currency_name'           => $primaryCurrency->name,
+                'currency_code'           => $primaryCurrency->code,
+                'currency_decimal_places' => $primaryCurrency->decimal_places,
+            ];
+        }
+
         // needs four for-each loops.
         foreach ([$earnedWith, $spentWith, $earnedWithout, $spentWithout, $transferredIn, $transferredOut] as $data) {
-            $this->processOpsArray($data);
+            $this->processOpsArray($data, $primaryCurrency, $convertToPrimary);
         }
+    }
+
+    public function sort()
+    {
+        uasort($this->report['categories'], function (array $cat1, array $cat2): int {
+            [$val1, $val2] = [$cat1['sum'], $cat2['sum']];
+            [$pos1, $pos2] = [bccomp($val1, '0') > 0, bccomp($val2, '0') > 0];
+
+            return ($pos2 <=> $pos1)
+                ?: bccomp(Steam::positive($val2), Steam::positive($val1))
+                ;
+        });
     }
 
     public function setAccounts(Collection $accounts): void
@@ -104,9 +134,29 @@ class CategoryReportGenerator
         $this->opsRepository->setUser($user);
     }
 
-    private function processCategoryRow(int $currencyId, array $currencyRow, int $categoryId, array $categoryRow): void
+    private function processCategoryRow(int $currencyId, array $currencyRow, int $categoryId, array $categoryRow, TransactionCurrency $primaryCurrency, bool $convertToPrimary): void
     {
-        $key = sprintf('%s-%s', $currencyId, $categoryId);
+        $key       = sprintf('%s-%s', $currencyId, $categoryId);
+        $getAmount = fn (array $journal) => $journal['amount'];
+
+        if ($convertToPrimary) {
+            $key = $categoryId;
+
+            $getAmount = match (true) {
+                $currencyId === $primaryCurrency->id => fn (array $journal) => $journal['amount'],
+                default => fn (array $journal) => $journal['pc_amount'],
+            };
+
+            $currencyId = $primaryCurrency->id;
+            $currencyRow = [
+                'currency_id'             => $primaryCurrency->id,
+                'currency_symbol'         => $primaryCurrency->symbol,
+                'currency_name'           => $primaryCurrency->name,
+                'currency_code'           => $primaryCurrency->code,
+                'currency_decimal_places' => $primaryCurrency->decimal_places,
+            ];
+        }
+
         $this->report['categories'][$key] ??= [
             'id'                      => $categoryId,
             'title'                   => $categoryRow['name'],
@@ -122,66 +172,76 @@ class CategoryReportGenerator
         // loop journals:
         foreach ($categoryRow['transaction_journals'] as $journal) {
             // sum of sums
-            $this->report['sums'][$currencyId]['sum']    = bcadd((string)$this->report['sums'][$currencyId]['sum'], (string)$journal['amount']);
+            $this->report['sums'][$currencyId]['sum']    = bcadd((string)$this->report['sums'][$currencyId]['sum'], $getAmount($journal));
             // sum of spent:
             $this->report['sums'][$currencyId]['spent']  = -1 === bccomp((string)$journal['amount'], '0') ? bcadd(
                 (string)$this->report['sums'][$currencyId]['spent'],
-                (string)$journal['amount']
+                $getAmount($journal),
             ) : $this->report['sums'][$currencyId]['spent'];
             // sum of earned
             $this->report['sums'][$currencyId]['earned'] = 1 === bccomp((string)$journal['amount'], '0') ? bcadd(
                 (string)$this->report['sums'][$currencyId]['earned'],
-                (string)$journal['amount']
+                $getAmount($journal),
             ) : $this->report['sums'][$currencyId]['earned'];
 
             // sum of category
-            $this->report['categories'][$key]['sum']     = bcadd((string)$this->report['categories'][$key]['sum'], (string)$journal['amount']);
+            $this->report['categories'][$key]['sum']     = bcadd((string)$this->report['categories'][$key]['sum'], $getAmount($journal));
             // total spent in category
             $this->report['categories'][$key]['spent']   = -1 === bccomp((string)$journal['amount'], '0') ? bcadd(
                 (string)$this->report['categories'][$key]['spent'],
-                (string)$journal['amount']
+                $getAmount($journal),
             ) : $this->report['categories'][$key]['spent'];
             // total earned in category
             $this->report['categories'][$key]['earned']  = 1 === bccomp((string)$journal['amount'], '0') ? bcadd(
                 (string)$this->report['categories'][$key]['earned'],
-                (string)$journal['amount']
+                $getAmount($journal),
             ) : $this->report['categories'][$key]['earned'];
         }
     }
 
-    private function processCurrencyArray(int $currencyId, array $currencyRow): void
+    private function processCurrencyArray(int $currencyId, array $currencyRow, TransactionCurrency $primaryCurrency, bool $convertToPrimary): void
     {
-        $this->report['sums'][$currencyId] ??= [
-            'spent'                   => '0',
-            'earned'                  => '0',
-            'sum'                     => '0',
-            'currency_id'             => $currencyRow['currency_id'],
-            'currency_symbol'         => $currencyRow['currency_symbol'],
-            'currency_name'           => $currencyRow['currency_name'],
-            'currency_code'           => $currencyRow['currency_code'],
-            'currency_decimal_places' => $currencyRow['currency_decimal_places'],
-        ];
+        if (!$convertToPrimary) {
+            $this->report['sums'][$currencyId] ??= [
+                'spent'                   => '0',
+                'earned'                  => '0',
+                'sum'                     => '0',
+                'currency_id'             => $currencyRow['currency_id'],
+                'currency_symbol'         => $currencyRow['currency_symbol'],
+                'currency_name'           => $currencyRow['currency_name'],
+                'currency_code'           => $currencyRow['currency_code'],
+                'currency_decimal_places' => $currencyRow['currency_decimal_places'],
+            ];
+        }
 
         /**
          * @var int   $categoryId
          * @var array $categoryRow
          */
         foreach ($currencyRow['categories'] as $categoryId => $categoryRow) {
-            $this->processCategoryRow($currencyId, $currencyRow, $categoryId, $categoryRow);
+            $this->processCategoryRow($currencyId, $currencyRow, $categoryId, $categoryRow, $primaryCurrency, $convertToPrimary);
         }
     }
 
     /**
      * Process one of the spent arrays from the operations method.
      */
-    private function processOpsArray(array $data): void
+    private function processOpsArray(array $data, TransactionCurrency $primaryCurrency, bool $convertToPrimary): void
     {
         /**
          * @var int   $currencyId
          * @var array $currencyRow
          */
         foreach ($data as $currencyId => $currencyRow) {
-            $this->processCurrencyArray($currencyId, $currencyRow);
+            $this->processCurrencyArray($currencyId, $currencyRow, $primaryCurrency, $convertToPrimary);
+        }
+
+        ksort($this->report['sums']);
+        if (isset($this->report['sums'][$primaryCurrency->id])) {
+            $primarySum = $this->report['sums'][$primaryCurrency->id];
+            unset($this->report['sums'][$primaryCurrency->id]);
+
+            $this->report['sums'] = [$primaryCurrency->id => $primarySum] + $this->report['sums'];
         }
     }
 }

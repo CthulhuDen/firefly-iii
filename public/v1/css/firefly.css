@@ -326,3 +326,7 @@ span.twitter-typeahead {
     background-color: #428bca;
 }
 */
+
+.money-negative {
+    white-space: nowrap;
+}

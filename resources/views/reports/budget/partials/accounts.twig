@@ -9,8 +9,11 @@
     {% for account in report %}
         {% for currency in account.currencies %}
             <tr>
-                <td data-value="{{ account.name }} ({{ currency.currency_name }})">
-                    <a href="{{ route('accounts.show', account.id) }}" title="{{ account.iban }}">{{ account.name }} ({{ currency.currency_name }})</a>
+                <td data-value="{{ account.name }}{% if not convertToPrimary %} ({{ currency.currency_name }}){% endif %}">
+                    <a href="{{ route('accounts.show', account.id) }}" title="{{ account.iban }}">
+                        {{ account.name }}
+                        {% if not convertToPrimary %} ({{ currency.currency_name }}) {% endif %}
+                    </a>
                 </td>
                 <td data-value="{{ currency.sum }}" style="text-align: right;">
                     {{ formatAmountBySymbol(currency.sum, currency.currency_symbol, currency.currency_decimal_places) }}
@@ -22,7 +25,7 @@
     <tfoot>
     {% for sum in sums %}
         <tr>
-            <td>{{ 'sum'|_ }} ({{ sum.currency_name }})</td>
+            <td>{{ 'sum'|_ }} {% if not convertToPrimary %} ({{ sum.currency_name }}) {% endif %}</td>
             <td style="text-align: right;">
                 {{ formatAmountBySymbol(sum.sum, sum.currency_symbol, sum.currency_decimal_places) }}
             </td>
