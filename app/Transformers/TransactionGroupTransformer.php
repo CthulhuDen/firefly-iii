@@ -124,7 +124,7 @@ class TransactionGroupTransformer extends AbstractTransformer
         }
 
         // set primary amount to the normal amount if the currency matches.
-        if ($transaction['primary_currency']['id'] ?? null === $transaction['currency_id']) {
+        if (($transaction['primary_currency']['id'] ?? null) === $transaction['currency_id']) {
             $transaction['pc_amount'] = $amount;
         }
 

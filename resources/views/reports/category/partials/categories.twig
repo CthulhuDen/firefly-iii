@@ -21,8 +21,11 @@
         {% endif %}
         {% for currency in category.currencies %}
             <tr>
-                <td data-value="{{ category.name }} ({{ currency.currency_name }})">
-                    <a href="{{ route('categories.show', category.id) }}" title="{{ category.name }}">{{ category.name }} ({{ currency.currency_name }})</a>
+                <td data-value="{{ category.name }}{% if not convertToPrimary%} ({{ currency.currency_name }}){% endif %}">
+                    <a href="{{ route('categories.show', category.id) }}" title="{{ category.name }}">
+                        {{ category.name }}
+                        {% if not convertToPrimary %} ({{ currency.currency_name }}) {% endif %}
+                    </a>
                 </td>
                 <td data-value="{{ currency.spent }}" style="text-align: right;">
                     {{ formatAmountBySymbol(currency.spent, currency.currency_symbol, currency.currency_decimal_places) }}
@@ -37,6 +40,7 @@
         {% endfor %}
     {% endfor %}
     </tbody>
+    {% if not convertToPrimary %}
     <tfoot>
     {% for sum in sums %}
         <tr>
@@ -53,4 +57,5 @@
         </tr>
     {% endfor %}
     </tfoot>
+    {% endif %}
 </table>

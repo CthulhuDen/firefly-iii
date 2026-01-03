@@ -109,7 +109,7 @@ class BudgetController extends Controller
         while ($end >= $loopStart) {
             /** @var Carbon $loopEnd */
             $loopEnd                = Navigation::endOfPeriod($loopStart, $step);
-            $spent                  = $this->opsRepository->sumExpenses($loopStart, $loopEnd, null, $collection); // this method already converts to primary currency.
+            $spent                  = $this->opsRepository->sumExpenses($loopStart, $loopEnd, null, $collection, null, $this->convertToPrimary);
             $label                  = trim(Navigation::periodShow($loopStart, $step));
 
             foreach ($spent as $row) {
@@ -170,15 +170,16 @@ class BudgetController extends Controller
         $entries                                = [];
         $amount                                 = $budgetLimit->amount ?? '0';
         $budgetCollection                       = new Collection()->push($budget);
-        $currency                               = $budgetLimit->transactionCurrency;
+        $currency                               = $filterCurrency = $budgetLimit->transactionCurrency;
         if ($this->convertToPrimary) {
-            $amount   = $budgetLimit->native_amount ?? $amount;
-            $currency = $this->primaryCurrency;
+            $amount         = $budgetLimit->native_amount ?? $amount;
+            $currency       = $this->primaryCurrency;
+            $filterCurrency = null;
         }
 
         while ($start <= $end) {
             $current          = clone $start;
-            $expenses         = $this->opsRepository->sumExpenses($current, $current, null, $budgetCollection, $budgetLimit->transactionCurrency, $this->convertToPrimary);
+            $expenses         = $this->opsRepository->sumExpenses($current, $current, null, $budgetCollection, $filterCurrency, $this->convertToPrimary);
             $spent            = $expenses[$currency->id]['sum'] ?? '0';
             $amount           = bcadd((string) $amount, $spent);
             $format           = $start->isoFormat((string) trans('config.month_and_day_js', [], $locale));
@@ -215,7 +216,10 @@ class BudgetController extends Controller
         if ($budgetLimit instanceof BudgetLimit) {
             $start = $budgetLimit->start_date;
             $end   = $budgetLimit->end_date;
-            $collector->setRange($budgetLimit->start_date, $budgetLimit->end_date)->setNormalCurrency($budgetLimit->transactionCurrency);
+            $collector->setRange($budgetLimit->start_date, $budgetLimit->end_date);
+            if (!$this->convertToPrimary) {
+                $collector->setNormalCurrency($budgetLimit->transactionCurrency);
+            }
         }
         $cache->addProperty($start);
         $cache->addProperty($end);
@@ -264,7 +268,9 @@ class BudgetController extends Controller
         foreach ($result as $combinedId => $info) {
             $parts   = explode('-', $combinedId);
             $assetId = (int) $parts[0];
-            $title   = sprintf('%s (%s)', $names[$assetId] ?? '(empty)', $info['currency_name']);
+            $title   = $this->convertToPrimary
+                ? $names[$assetId] ?? '(empty)'
+                : sprintf('%s (%s)', $names[$assetId] ?? '(empty)', $info['currency_name']);
             $chartData[$title]
                      = [
                          'amount'          => $info['amount'],
@@ -297,7 +303,9 @@ class BudgetController extends Controller
         if ($budgetLimit instanceof BudgetLimit) {
             $start = $budgetLimit->start_date;
             $end   = $budgetLimit->end_date;
-            $collector->setNormalCurrency($budgetLimit->transactionCurrency);
+            if (!$this->convertToPrimary) {
+                $collector->setNormalCurrency($budgetLimit->transactionCurrency);
+            }
         }
         $cache->addProperty($start);
         $cache->addProperty($end);
@@ -348,7 +356,9 @@ class BudgetController extends Controller
         foreach ($result as $combinedId => $info) {
             $parts             = explode('-', $combinedId);
             $categoryId        = (int) $parts[0];
-            $title             = sprintf('%s (%s)', $names[$categoryId] ?? '(empty)', $info['currency_name']);
+            $title             = $this->convertToPrimary
+                ? $names[$categoryId] ?? '(empty)'
+                : sprintf('%s (%s)', $names[$categoryId] ?? '(empty)', $info['currency_name']);
             $chartData[$title] = [
                 'amount'          => $info['amount'],
                 'currency_symbol' => $info['currency_symbol'],
@@ -379,7 +389,10 @@ class BudgetController extends Controller
         if ($budgetLimit instanceof BudgetLimit) {
             $start = $budgetLimit->start_date;
             $end   = $budgetLimit->end_date;
-            $collector->setRange($budgetLimit->start_date, $budgetLimit->end_date)->setNormalCurrency($budgetLimit->transactionCurrency);
+            $collector->setRange($budgetLimit->start_date, $budgetLimit->end_date);
+            if (!$this->convertToPrimary) {
+                $collector->setNormalCurrency($budgetLimit->transactionCurrency);
+            }
         }
         $cache->addProperty($start);
         $cache->addProperty($end);
@@ -432,7 +445,9 @@ class BudgetController extends Controller
             $parts             = explode('-', $combinedId);
             $opposingId        = (int) $parts[0];
             $name              = $names[$opposingId] ?? 'no name';
-            $title             = sprintf('%s (%s)', $name, $info['currency_name']);
+            $title             = $this->convertToPrimary
+                ? $name
+                : sprintf('%s (%s)', $name, $info['currency_name']);
             $chartData[$title] = [
                 'amount'          => $info['amount'],
                 'currency_symbol' => $info['currency_symbol'],
@@ -501,7 +516,9 @@ class BudgetController extends Controller
         $preferredRange = Navigation::preferredRangeFormat($start, $end);
         $chartData      = [
             [
-                'label'           => (string) trans('firefly.box_spent_in_currency', ['currency' => $currency->name]),
+                'label'           => $this->convertToPrimary
+                    ? trans('firefly.spent')
+                    : trans('firefly.box_spent_in_currency', ['currency' => $currency->name]),
                 'type'            => 'bar',
                 'entries'         => [],
                 'currency_symbol' => $currency->symbol,
@@ -535,7 +552,7 @@ class BudgetController extends Controller
             }
 
             // get spent amount in this period for this currency.
-            $sum                             = $this->opsRepository->sumExpenses($currentStart, $currentEnd, $accounts, new Collection()->push($budget), $currency);
+            $sum                             = $this->opsRepository->sumExpenses($currentStart, $currentEnd, $accounts, new Collection()->push($budget), null, $this->convertToPrimary);
             $amount                          = app('steam')->positive($sum[$currency->id]['sum'] ?? '0');
             $chartData[0]['entries'][$title] = app('steam')->bcround($amount, $currency->decimal_places);
 

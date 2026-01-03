@@ -146,7 +146,9 @@ class FrontpageChartGenerator
         foreach ($this->currencies as $currencyId => $currency) {
             $key          = sprintf('spent-%d', $currencyId);
             $return[$key] = [
-                'label'           => sprintf('%s (%s)', (string)trans('firefly.spent'), $currency['currency_name']),
+                'label'           => $this->convertToPrimary
+                    ? trans('firefly.spent')
+                    : sprintf('%s (%s)', trans('firefly.spent'), $currency['currency_name']),
                 'type'            => 'bar',
                 'currency_symbol' => $currency['currency_symbol'],
                 'entries'         => $names,

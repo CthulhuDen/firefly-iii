@@ -2363,6 +2363,7 @@ return [
     'coveredWithTags'                           => 'Covered with tags',
     'leftInBudget'                              => 'Left in budget',
     'left_in_debt'                              => 'Amount due',
+    'sumByCur'                                  => 'Sum by currency',
     'sumOfSums'                                 => 'Sum of sums',
     'noCategory'                                => '(no category)',
     'notCharged'                                => 'Not charged (yet)',

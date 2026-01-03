@@ -36,9 +36,12 @@
             </td>
         </tr>
     {% endif %}
+    <tr>
+        <td colspan="5" class="text-center"><em>TODO@DELETE {{ 'sumByCur'|_ }} TODO@DELETE</em></td>
+    </tr>
     {% for sum in report.sums %}
     <tr>
-        <td><em>{{ 'sum'|_ }} ({{ sum.currency_name }})</em></td>
+        <td>{{ sum.currency_name }} ({{ sum.currency_code }})</td>
         <td style="text-align: right;">
             {{ formatAmountBySymbol(sum.spent, sum.currency_symbol, sum.currency_decimal_places) }}
         </td>
@@ -48,6 +51,7 @@
         <td style="text-align: right;">
             {{ formatAmountBySymbol(sum.sum, sum.currency_symbol, sum.currency_decimal_places) }}
         </td>
+        <td>&nbsp;</td>
     </tr>
     {% endfor %}
     </tfoot>

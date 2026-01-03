@@ -108,10 +108,10 @@ class CategoryController extends Controller
      */
     public function frontPage(): JsonResponse
     {
-        $start              = session('start', today(config('app.timezone'))->startOfMonth());
-        $end                = session('end', today(config('app.timezone'))->endOfMonth());
+        $start                                = session('start', today(config('app.timezone'))->startOfMonth());
+        $end                                  = session('end', today(config('app.timezone'))->endOfMonth());
         // chart properties for cache:
-        $cache              = new CacheProperties();
+        $cache                                = new CacheProperties();
         $cache->addProperty($start);
         $cache->addProperty($end);
         $cache->addProperty($this->convertToPrimary);
@@ -120,9 +120,10 @@ class CategoryController extends Controller
             return response()->json($cache->get());
         }
 
-        $frontpageGenerator = new FrontpageChartGenerator($start, $end);
-        $chartData          = $frontpageGenerator->generate();
-        $data               = $this->generator->multiSet($chartData);
+        $frontpageGenerator                   = new FrontpageChartGenerator($start, $end);
+        $frontpageGenerator->convertToPrimary = $this->convertToPrimary;
+        $chartData                            = $frontpageGenerator->generate();
+        $data                                 = $this->generator->multiSet($chartData);
         $cache->store($data);
 
         return response()->json($data);
@@ -188,17 +189,25 @@ class CategoryController extends Controller
             $currencyInfo = $expenses[$currencyId] ?? $income[$currencyId];
             $outKey       = sprintf('%d-out', $currencyId);
             $inKey        = sprintf('%d-in', $currencyId);
+            if ($this->convertToPrimary) {
+                $outKey = 'out';
+                $inKey  = 'in';
+            }
             $chartData[$outKey]
-                          = [
-                              'label'           => sprintf('%s (%s)', (string) trans('firefly.spent'), $currencyInfo['currency_name']),
+                          ??= [
+                              'label'           => $this->convertToPrimary
+                                                        ? trans('firefly.spent')
+                                                        : sprintf('%s (%s)', trans('firefly.spent'), $currencyInfo['currency_name']),
                               'entries'         => [],
                               'type'            => 'bar',
                               'backgroundColor' => 'rgba(219, 68, 55, 0.5)', // red
                           ];
 
             $chartData[$inKey]
-                          = [
-                              'label'           => sprintf('%s (%s)', (string) trans('firefly.earned'), $currencyInfo['currency_name']),
+                          ??= [
+                              'label'           => $this->convertToPrimary
+                                                        ? trans('firefly.earned')
+                                                        : sprintf('%s (%s)', trans('firefly.earned'), $currencyInfo['currency_name']),
                               'entries'         => [],
                               'type'            => 'bar',
                               'backgroundColor' => 'rgba(0, 141, 76, 0.5)', // green
@@ -206,8 +215,8 @@ class CategoryController extends Controller
             // loop empty periods:
             foreach (array_keys($periods) as $period) {
                 $label                                 = $periods[$period];
-                $chartData[$outKey]['entries'][$label] = '0';
-                $chartData[$inKey]['entries'][$label]  = '0';
+                $chartData[$outKey]['entries'][$label] ??= '0';
+                $chartData[$inKey]['entries'][$label]  ??= '0';
             }
             // loop income and expenses for this category.:
             $outSet       = $expenses[$currencyId]['categories'][$categoryId] ?? ['transaction_journals' => []];
@@ -215,6 +224,10 @@ class CategoryController extends Controller
                 $amount                               = Steam::positive($journal['amount']);
                 $date                                 = $journal['date']->isoFormat($format);
                 $chartData[$outKey]['entries'][$date] ??= '0';
+
+                if ($this->convertToPrimary && $currencyId !== $this->primaryCurrency->id) {
+                    $amount = Steam::positive($journal['pc_amount']);
+                }
 
                 $chartData[$outKey]['entries'][$date] = bcadd($amount, $chartData[$outKey]['entries'][$date]);
             }
@@ -224,6 +237,11 @@ class CategoryController extends Controller
                 $amount                              = Steam::positive($journal['amount']);
                 $date                                = $journal['date']->isoFormat($format);
                 $chartData[$inKey]['entries'][$date] ??= '0';
+
+                if ($this->convertToPrimary && $currencyId !== $this->primaryCurrency->id) {
+                    $amount = Steam::positive($journal['pc_amount']);
+                }
+
                 $chartData[$inKey]['entries'][$date] = bcadd($amount, $chartData[$inKey]['entries'][$date]);
             }
         }
@@ -279,6 +297,7 @@ class CategoryController extends Controller
 
         /** @var WholePeriodChartGenerator $chartGenerator */
         $chartGenerator = app(WholePeriodChartGenerator::class);
+        $chartGenerator->convertToPrimary = $this->convertToPrimary;
         $chartData      = $chartGenerator->generate($category, $start, $end);
         $data           = $this->generator->multiSet($chartData);
 

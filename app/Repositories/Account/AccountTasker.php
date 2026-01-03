@@ -30,6 +30,7 @@ use FireflyIII\Helpers\Collector\GroupCollectorInterface;
 use FireflyIII\Models\Account;
 use FireflyIII\Repositories\Currency\CurrencyRepositoryInterface;
 use FireflyIII\Support\Facades\Steam;
+use FireflyIII\Support\Http\Api\ExchangeRateConverter;
 use FireflyIII\Support\Repositories\UserGroup\UserGroupInterface;
 use FireflyIII\Support\Repositories\UserGroup\UserGroupTrait;
 use Illuminate\Support\Collection;
@@ -64,7 +65,19 @@ class AccountTasker implements AccountTaskerInterface, UserGroupInterface
         $return          = [
             'accounts' => [],
             'sums'     => [],
+            'sum'      => [
+                'start'                   => '0',
+                'end'                     => '0',
+                'difference'              => '0',
+                'currency_id'             => $primaryCurrency->id,
+                'currency_code'           => $primaryCurrency->code,
+                'currency_symbol'         => $primaryCurrency->symbol,
+                'currency_name'           => $primaryCurrency->name,
+                'currency_decimal_places' => $primaryCurrency->decimal_places,
+            ],
         ];
+
+        $allCurrencies = [];
 
         /** @var Account $account */
         foreach ($accounts as $account) {
@@ -104,10 +117,37 @@ class AccountTasker implements AccountTaskerInterface, UserGroupInterface
             $return['sums'][$currency->id]['start'] = bcadd($return['sums'][$currency->id]['start'], (string) $entry['start_balance']);
             $return['sums'][$currency->id]['end']   = bcadd($return['sums'][$currency->id]['end'], $entry['end_balance']);
             $return['accounts'][$id]                = $entry;
+
+            $allCurrencies[$currency->id] = $currency;
         }
 
         foreach (array_keys($return['sums']) as $index) {
             $return['sums'][$index]['difference'] = bcsub($return['sums'][$index]['end'], $return['sums'][$index]['start']);
+        }
+
+        ksort($return['sums']);
+        if (isset($return['sums'][$primaryCurrency->id])) {
+            $primarySum = $return['sums'][$primaryCurrency->id];
+            unset($return['sums'][$primaryCurrency->id]);
+
+            $return['sums'] = [$primaryCurrency->id => $primarySum] + $return['sums'];
+        }
+
+        if (app('amount')->convertToPrimary($this->user)) {
+            $converter = app(ExchangeRateConverter::class);
+            foreach ($return['sums'] as $curId => $curSum) {
+                if ($curId === $primaryCurrency->id) {
+                    $return['sum']['start'] = bcadd($return['sum']['start'], $curSum['start']);
+                    $return['sum']['end'] = bcadd($return['sum']['end'], $curSum['end']);
+                    continue;
+                }
+
+                $cur = $allCurrencies[$curId];
+                $return['sum']['start'] = bcadd($return['sum']['start'], $converter->convert($cur, $primaryCurrency, $start, $curSum['start']));
+                $return['sum']['end'] = bcadd($return['sum']['end'], $converter->convert($cur, $primaryCurrency, $end, $curSum['end']));
+            }
+
+            $return['sum']['difference'] = bcsub($return['sum']['end'], $return['sum']['start']);
         }
 
         return $return;
@@ -147,6 +187,7 @@ class AccountTasker implements AccountTaskerInterface, UserGroupInterface
     private function groupExpenseByDestination(array $array): array
     {
         $primaryCurrency = app('amount')->getPrimaryCurrencyByUserGroup($this->user->userGroup);
+        $convertToPrimary = app('amount')->convertToPrimary($this->user);
 
         /** @var CurrencyRepositoryInterface $currencyRepos */
         $currencyRepos   = app(CurrencyRepositoryInterface::class);
@@ -154,6 +195,14 @@ class AccountTasker implements AccountTaskerInterface, UserGroupInterface
         $report          = [
             'accounts' => [],
             'sums'     => [],
+            'sum' => [
+                'sum' => '0',
+                'currency_id'             => $primaryCurrency->id,
+                'currency_name'           => $primaryCurrency->name,
+                'currency_symbol'         => $primaryCurrency->symbol,
+                'currency_code'           => $primaryCurrency->code,
+                'currency_decimal_places' => $primaryCurrency->decimal_places,
+            ],
         ];
 
         /** @var array $journal */
@@ -179,6 +228,14 @@ class AccountTasker implements AccountTaskerInterface, UserGroupInterface
             Log::debug(sprintf('Sum for %s is now %s', $journal['destination_account_name'], $report['accounts'][$key]['sum']));
 
             ++$report['accounts'][$key]['count'];
+
+            if ($convertToPrimary) {
+                $pcAmount = match (true) {
+                    $currencyId === $primaryCurrency->id => $journal['amount'],
+                    default => $journal['pc_amount'],
+                };
+                $report['sum']['sum'] = bcadd($report['sum']['sum'], $pcAmount);
+            }
         }
 
         // do averages and sums.
@@ -196,6 +253,14 @@ class AccountTasker implements AccountTaskerInterface, UserGroupInterface
                 'currency_decimal_places' => $report['accounts'][$key]['currency_decimal_places'],
             ];
             $report['sums'][$currencyId]['sum'] = bcadd($report['sums'][$currencyId]['sum'], $report['accounts'][$key]['sum']);
+        }
+
+        ksort($report['sums']);
+        if (isset($report['sums'][$primaryCurrency->id])) {
+            $primarySum = $report['sums'][$primaryCurrency->id];
+            unset($report['sums'][$primaryCurrency->id]);
+
+            $report['sums'] = [$primaryCurrency->id => $primarySum] + $report['sums'];
         }
 
         return $report;
@@ -232,6 +297,7 @@ class AccountTasker implements AccountTaskerInterface, UserGroupInterface
     private function groupIncomeBySource(array $array): array
     {
         $primaryCurrency = app('amount')->getPrimaryCurrencyByUserGroup($this->user->userGroup);
+        $convertToPrimary = app('amount')->convertToPrimary($this->user);
 
         /** @var CurrencyRepositoryInterface $currencyRepos */
         $currencyRepos   = app(CurrencyRepositoryInterface::class);
@@ -239,6 +305,14 @@ class AccountTasker implements AccountTaskerInterface, UserGroupInterface
         $report          = [
             'accounts' => [],
             'sums'     => [],
+            'sum'      => [
+                'sum' => '0',
+                'currency_id'             => $primaryCurrency->id,
+                'currency_name'           => $primaryCurrency->name,
+                'currency_symbol'         => $primaryCurrency->symbol,
+                'currency_code'           => $primaryCurrency->code,
+                'currency_decimal_places' => $primaryCurrency->decimal_places,
+            ],
         ];
 
         /** @var array $journal */
@@ -263,6 +337,14 @@ class AccountTasker implements AccountTaskerInterface, UserGroupInterface
             }
             $report['accounts'][$key]['sum'] = bcadd($report['accounts'][$key]['sum'], bcmul((string) $journal['amount'], '-1'));
             ++$report['accounts'][$key]['count'];
+
+            if ($convertToPrimary) {
+                $pcAmount = match (true) {
+                    $currencyId === $primaryCurrency->id => $journal['amount'],
+                    default => $journal['pc_amount'],
+                };
+                $report['sum']['sum'] = bcadd($report['sum']['sum'], bcmul($pcAmount, '-1'));
+            }
         }
 
         // do averages and sums.
@@ -280,6 +362,14 @@ class AccountTasker implements AccountTaskerInterface, UserGroupInterface
                 'currency_decimal_places' => $report['accounts'][$key]['currency_decimal_places'],
             ];
             $report['sums'][$currencyId]['sum'] = bcadd($report['sums'][$currencyId]['sum'], $report['accounts'][$key]['sum']);
+        }
+
+        ksort($report['sums']);
+        if (isset($report['sums'][$primaryCurrency->id])) {
+            $primarySum = $report['sums'][$primaryCurrency->id];
+            unset($report['sums'][$primaryCurrency->id]);
+
+            $report['sums'] = [$primaryCurrency->id => $primarySum] + $report['sums'];
         }
 
         return $report;

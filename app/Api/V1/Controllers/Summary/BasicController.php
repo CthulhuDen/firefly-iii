@@ -117,6 +117,10 @@ class BasicController extends Controller
     private function getBalanceInformation(Carbon $start, Carbon $end): array
     {
         Log::debug('getBalanceInformation');
+
+        /** @var User $user */
+        $user             = auth()->user();
+
         // some config settings
         $convertToPrimary = Amount::convertToPrimary();
         $primary          = Amount::getPrimaryCurrency();
@@ -130,97 +134,29 @@ class BasicController extends Controller
         // collect income of user using the new group collector.
         /** @var GroupCollectorInterface $collector */
         $collector        = app(GroupCollectorInterface::class);
-        $summarizer       = new TransactionSummarizer();
+        $summarizer       = new TransactionSummarizer($user);
+        $summarizer->setConvertToPrimary($convertToPrimary);
         $set              = $collector->setRange($start, $end)->setTypes([TransactionTypeEnum::DEPOSIT->value])->getExtractedJournals();
         $incomes          = $summarizer->groupByCurrencyId($set, 'positive', false);
 
 
-        // collect expenses of user.
         // collect expenses of user using the new group collector.
         /** @var GroupCollectorInterface $collector */
         $collector        = app(GroupCollectorInterface::class);
-        $set              = $collector->setRange($start, $end)->setPage($this->parameters->get('page'))->setTypes([TransactionTypeEnum::WITHDRAWAL->value])->getExtractedJournals();
+        $set              = $collector->setRange($start, $end)->setPage((int) request()->query('page'))->setTypes([TransactionTypeEnum::WITHDRAWAL->value])->getExtractedJournals();
         $expenses         = $summarizer->groupByCurrencyId($set, 'negative', false);
 
-        // if convert to primary, do so right now.
-        if ($convertToPrimary) {
-            $newExpenses = [
-                $primary->id => [
-                    'currency_id'             => $primary->id,
-                    'currency_code'           => $primary->code,
-                    'currency_symbol'         => $primary->symbol,
-                    'currency_decimal_places' => $primary->decimal_places,
+        foreach ([$expenses, $incomes] as $array) {
+            foreach ($array as $entry) {
+                $currencyId               = $entry['currency_id'];
+                $sums[$currencyId] ??= [
+                    'currency_id'             => $entry['currency_id'],
+                    'currency_code'           => $entry['currency_code'],
+                    'currency_symbol'         => $entry['currency_symbol'],
+                    'currency_decimal_places' => $entry['currency_decimal_places'],
                     'sum'                     => '0',
-                ],
-            ];
-            $newIncomes  = [
-                $primary->id => [
-                    'currency_id'             => $primary->id,
-                    'currency_code'           => $primary->code,
-                    'currency_symbol'         => $primary->symbol,
-                    'currency_decimal_places' => $primary->decimal_places,
-                    'sum'                     => '0',
-                ],
-            ];
-            $sums        = [
-                $primary->id => [
-                    'currency_id'             => $primary->id,
-                    'currency_code'           => $primary->code,
-                    'currency_symbol'         => $primary->symbol,
-                    'currency_decimal_places' => $primary->decimal_places,
-                    'sum'                     => '0',
-                ],
-            ];
-
-            $converter   = new ExchangeRateConverter();
-            // loop over income and expenses
-            foreach ([$expenses, $incomes] as $index => $array) {
-
-                // loop over either one.
-                foreach ($array as $entry) {
-
-                    // if it is the primary currency already.
-                    if ($entry['currency_id'] === $primary->id) {
-                        $sums[$primary->id]['sum'] = bcadd((string) $entry['sum'], $sums[$primary->id]['sum']);
-
-                        // don't forget to add it to newExpenses and newIncome
-                        if (0 === $index) {
-                            $newExpenses[$primary->id]['sum'] = bcadd($newExpenses[$primary->id]['sum'], (string) $entry['sum']);
-                        }
-                        if (1 === $index) {
-                            $newIncomes[$primary->id]['sum'] = bcadd($newIncomes[$primary->id]['sum'], (string) $entry['sum']);
-                        }
-
-                        continue;
-                    }
-
-                    $currencies[$entry['currency_id']] ??= $this->currencyRepos->find($entry['currency_id']);
-                    $convertedSum              = $converter->convert($currencies[$entry['currency_id']], $primary, $start, $entry['sum']);
-                    $sums[$primary->id]['sum'] = bcadd($sums[$primary->id]['sum'], $convertedSum);
-                    if (0 === $index) {
-                        $newExpenses[$primary->id]['sum'] = bcadd($newExpenses[$primary->id]['sum'], $convertedSum);
-                    }
-                    if (1 === $index) {
-                        $newIncomes[$primary->id]['sum'] = bcadd($newIncomes[$primary->id]['sum'], $convertedSum);
-                    }
-                }
-            }
-            $incomes     = $newIncomes;
-            $expenses    = $newExpenses;
-        }
-        if (!$convertToPrimary) {
-            foreach ([$expenses, $incomes] as $array) {
-                foreach ($array as $entry) {
-                    $currencyId               = $entry['currency_id'];
-                    $sums[$currencyId] ??= [
-                        'currency_id'             => $entry['currency_id'],
-                        'currency_code'           => $entry['currency_code'],
-                        'currency_symbol'         => $entry['currency_symbol'],
-                        'currency_decimal_places' => $entry['currency_decimal_places'],
-                        'sum'                     => '0',
-                    ];
-                    $sums[$currencyId]['sum'] = bcadd($sums[$currencyId]['sum'], (string) $entry['sum']);
-                }
+                ];
+                $sums[$currencyId]['sum'] = bcadd($sums[$currencyId]['sum'], (string) $entry['sum']);
             }
         }
         // format amounts:
@@ -246,7 +182,9 @@ class BasicController extends Controller
             ];
             $return[] = [
                 'key'                     => sprintf('spent-in-%s', $currency->code),
-                'title'                   => trans('firefly.box_spent_in_currency', ['currency' => $currency->symbol]),
+                'title'                   => $this->convertToPrimary
+                    ? trans('firefly.spent')
+                    : trans('firefly.box_spent_in_currency', ['currency' => $currency->symbol]),
                 'monetary_value'          => $expenses[$currencyId]['sum'] ?? '0',
                 'currency_id'             => (string) $currency->id,
                 'currency_code'           => $currency->code,
@@ -258,7 +196,9 @@ class BasicController extends Controller
             ];
             $return[] = [
                 'key'                     => sprintf('earned-in-%s', $currency->code),
-                'title'                   => trans('firefly.box_earned_in_currency', ['currency' => $currency->symbol]),
+                'title'                   => $this->convertToPrimary
+                    ? trans('firefly.earned')
+                    : trans('firefly.box_earned_in_currency', ['currency' => $currency->symbol]),
                 'monetary_value'          => $incomes[$currencyId]['sum'] ?? '0',
                 'currency_id'             => (string) $currency->id,
                 'currency_code'           => $currency->code,
@@ -287,7 +227,9 @@ class BasicController extends Controller
             ];
             $return[] = [
                 'key'                     => sprintf('spent-in-%s', $currency->code),
-                'title'                   => trans('firefly.box_spent_in_currency', ['currency' => $currency->symbol]),
+                'title'                   => $this->convertToPrimary
+                    ? trans('firefly.spent')
+                    : trans('firefly.box_spent_in_currency', ['currency' => $currency->symbol]),
                 'monetary_value'          => '0',
                 'currency_id'             => (string) $currency->id,
                 'currency_code'           => $currency->code,
@@ -299,7 +241,9 @@ class BasicController extends Controller
             ];
             $return[] = [
                 'key'                     => sprintf('earned-in-%s', $currency->code),
-                'title'                   => trans('firefly.box_earned_in_currency', ['currency' => $currency->symbol]),
+                'title'                   => $this->convertToPrimary
+                    ? trans('firefly.earned')
+                    : trans('firefly.box_earned_in_currency', ['currency' => $currency->symbol]),
                 'monetary_value'          => '0',
                 'currency_id'             => (string) $currency->id,
                 'currency_code'           => $currency->code,
@@ -467,7 +411,7 @@ class BasicController extends Controller
         $today      = today(config('app.timezone'));
         $available  = $this->abRepository->getAvailableBudgetWithCurrency($start, $end);
         $budgets    = $this->budgetRepository->getActiveBudgets();
-        $spent      = $this->opsRepository->sumExpenses($start, $end, null, $budgets);
+        $spent      = $this->opsRepository->sumExpenses($start, $end, null, $budgets, null, $this->convertToPrimary);
         $days       = (int) $today->diffInDays($end, true) + 1;
         $currencies = [];
 
@@ -524,7 +468,7 @@ class BasicController extends Controller
         if (0 === count($return)) {
             $days  = (int) $start->diffInDays($end, true) + 1;
             // a small trick to get every expense in this period, regardless of budget.
-            $spent = $this->opsRepository->sumExpenses($start, $end, null, new Collection());
+            $spent = $this->opsRepository->sumExpenses($start, $end, null, new Collection(), null, $this->convertToPrimary);
             foreach ($spent as $row) {
                 // either an amount was budgeted or 0 is available.
                 $currencyId          = (int) $row['currency_id'];

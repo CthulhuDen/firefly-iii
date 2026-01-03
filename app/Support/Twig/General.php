@@ -194,7 +194,7 @@ class General extends AbstractExtension
                         continue;
                     }
                     // for multi currency accounts.
-                    if ($usePrimary && $key !== $primary->code) {
+                    if ($usePrimary && $key !== $primary->code && $key !== $currency->code) {
                         $strings[] = app('amount')->formatAnything(Amount::getTransactionCurrencyByCode($key), $balance, false);
                     }
                 }

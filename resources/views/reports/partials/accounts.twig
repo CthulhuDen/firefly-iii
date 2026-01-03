@@ -26,12 +26,12 @@
         </tr>
     {% endfor %}
     <tr>
-        <td colspan="4"><em>{{ 'sumOfSums'|_ }}</em></td>
+        <td colspan="4" class="text-center"><em>{{ 'sumByCur'|_ }}</em></td>
     </tr>
     {% for sum in accountReport.sums %}
     <tr>
         <td>
-            &nbsp;
+            {{ sum.currency_name }} ({{ sum.currency_code }})
         </td>
         <td style="text-align: right;">
             {{ formatAmountBySymbol(sum.start, sum.currency_symbol, sum.currency_decimal_places) }}
@@ -44,5 +44,24 @@
         </td>
     </tr>
     {% endfor %}
+    {% if convertToPrimary %}
+        <tr>
+            <td colspan="4" class="text-center"><em>{{ 'sumOfSums'|_ }}</em></td>
+        </tr>
+        <tr>
+            <td>
+                {{ 'total'|_ }}
+            </td>
+            <td style="text-align: right;">
+                {{ formatAmountBySymbol(accountReport.sum.start, primaryCurrency.currency_symbol, primaryCurrency.currency_decimal_places) }}
+            </td>
+            <td style="text-align: right;">
+                {{ formatAmountBySymbol(accountReport.sum.end, primaryCurrency.currency_symbol, primaryCurrency.currency_decimal_places) }}
+            </td>
+            <td style="text-align: right;">
+                {{ formatAmountBySymbol(accountReport.sum.difference, primaryCurrency.currency_symbol, primaryCurrency.currency_decimal_places) }}
+            </td>
+        </tr>
+    {% endif %}
     </tbody>
 </table>

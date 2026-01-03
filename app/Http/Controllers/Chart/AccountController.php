@@ -287,7 +287,9 @@ class AccountController extends Controller
         foreach ($result as $row) {
             $budgetId          = $row['budget_id'];
             $name              = $names[$budgetId];
-            $label             = (string)trans('firefly.name_in_currency', ['name' => $name, 'currency' => $row['currency_name']]);
+            $label             = $this->convertToPrimary
+                ? (string) $name
+                : (string)trans('firefly.name_in_currency', ['name' => $name, 'currency' => $row['currency_name']]);
             $chartData[$label] = ['amount' => $row['total'], 'currency_symbol' => $row['currency_symbol'], 'currency_code' => $row['currency_code']];
         }
 
@@ -366,7 +368,9 @@ class AccountController extends Controller
         foreach ($result as $row) {
             $categoryId        = $row['category_id'];
             $name              = $names[$categoryId] ?? '(unknown)';
-            $label             = (string)trans('firefly.name_in_currency', ['name' => $name, 'currency' => $row['currency_name']]);
+            $label             = $this->convertToPrimary
+                ? (string) $name
+                : (string)trans('firefly.name_in_currency', ['name' => $name, 'currency' => $row['currency_name']]);
             $chartData[$label] = ['amount' => $row['total'], 'currency_symbol' => $row['currency_symbol'], 'currency_code' => $row['currency_code']];
         }
 
@@ -473,7 +477,9 @@ class AccountController extends Controller
         foreach ($result as $row) {
             $categoryId        = $row['category_id'];
             $name              = $names[$categoryId] ?? '(unknown)';
-            $label             = (string)trans('firefly.name_in_currency', ['name' => $name, 'currency' => $row['currency_name']]);
+            $label             = $this->convertToPrimary
+                ? (string) $name
+                : (string)trans('firefly.name_in_currency', ['name' => $name, 'currency' => $row['currency_name']]);
             $chartData[$label] = ['amount' => $row['total'], 'currency_symbol' => $row['currency_symbol'], 'currency_code' => $row['currency_code']];
         }
         $data      = $this->generator->multiCurrencyPieChart($chartData);
@@ -585,6 +591,10 @@ class AccountController extends Controller
 
         foreach ($return as $key => $info) {
             if ('balance' !== $key && 'pc_balance' !== $key) {
+                if ($this->convertToPrimary) {
+                    continue;
+                }
+
                 // assume it's a currency:
                 $setCurrency             = $this->currencyRepository->findByCode((string)$key);
                 $info['currency_symbol'] = $setCurrency->symbol;
@@ -592,6 +602,10 @@ class AccountController extends Controller
                 $info['label']           = sprintf('%s (%s)', $account->name, $setCurrency->symbol);
             }
             if ('balance' === $key) {
+                if ($this->convertToPrimary) {
+                    continue;
+                }
+
                 $info['currency_symbol'] = $accountCurrency->symbol;
                 $info['currency_code']   = $accountCurrency->code;
                 $info['label']           = sprintf('%s (%s)', $account->name, $accountCurrency->symbol);
@@ -599,7 +613,9 @@ class AccountController extends Controller
             if ('pc_balance' === $key) {
                 $info['currency_symbol'] = $this->primaryCurrency->symbol;
                 $info['currency_code']   = $this->primaryCurrency->code;
-                $info['label']           = sprintf('%s (%s) (%s)', $account->name, (string)trans('firefly.sum'), $this->primaryCurrency->symbol);
+                $info['label']           = $this->convertToPrimary
+                    ? $account->name
+                    : sprintf('%s (%s) (%s)', $account->name, (string)trans('firefly.sum'), $this->primaryCurrency->symbol);
             }
             $chartData[] = $info;
         }

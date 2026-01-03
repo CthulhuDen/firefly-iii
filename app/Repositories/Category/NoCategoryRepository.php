@@ -78,8 +78,11 @@ class NoCategoryRepository implements NoCategoryRepositoryInterface, UserGroupIn
             $journalId  = (int) $journal['transaction_journal_id'];
             $array[$currencyId]['categories'][0]['transaction_journals'][$journalId]
                         = [
-                            'amount' => app('steam')->negative($journal['amount']),
-                            'date'   => $journal['date'],
+                            'amount'    => app('steam')->negative($journal['amount']),
+                            'pc_amount' => empty($journal['pc_amount'])
+                                                ? ($journal['pc_amount'] ?? null)
+                                                : app('steam')->negative($journal['pc_amount']),
+                            'date'      => $journal['date'],
                         ];
         }
 
@@ -124,8 +127,11 @@ class NoCategoryRepository implements NoCategoryRepositoryInterface, UserGroupIn
             $journalId  = (int) $journal['transaction_journal_id'];
             $array[$currencyId]['categories'][0]['transaction_journals'][$journalId]
                         = [
-                            'amount' => app('steam')->positive($journal['amount']),
-                            'date'   => $journal['date'],
+                            'amount'    => app('steam')->positive($journal['amount']),
+                            'pc_amount' => empty($journal['pc_amount'])
+                                                ? ($journal['pc_amount'] ?? null)
+                                                : app('steam')->positive($journal['pc_amount']),
+                            'date'      => $journal['date'],
                         ];
         }
 

@@ -11,8 +11,8 @@
     {% for account in report %}
         {% for currency in account.currencies %}
             <tr>
-                <td data-value="{{ account.name }} ({{ currency.currency_name }})">
-                    <a href="{{ route('accounts.show', account.id) }}" title="{{ account.iban }}">{{ account.name }} ({{ currency.currency_name }})</a>
+                <td data-value="{{ account.name }}">
+                    <a href="{{ route('accounts.show', account.id) }}" title="{{ account.iban }}">{{ account.name }}</a>
                 </td>
                 <td data-value="{{ currency.spent }}" style="text-align: right;">
                     {{ formatAmountBySymbol(currency.spent, currency.currency_symbol, currency.currency_decimal_places) }}
@@ -28,9 +28,12 @@
     {% endfor %}
     </tbody>
     <tfoot>
+    <tr>
+        <td colspan="4" class="text-center"><em>{{ 'sumByCur'|_ }}</em></td>
+    </tr>
     {% for sum in sums %}
         <tr>
-            <td>{{ 'sum'|_ }} ({{ sum.currency_name }})</td>
+            <td>{{ sum.currency_name }} ({{ sum.currency_code }})</td>
             <td style="text-align: right;">
                 {{ formatAmountBySymbol(sum.spent_sum, sum.currency_symbol, sum.currency_decimal_places) }}
             </td>
@@ -42,5 +45,24 @@
             </td>
         </tr>
     {% endfor %}
+    {% if convertToPrimary %}
+        <tr>
+            <td colspan="4" class="text-center"><em>{{ 'sumOfSums'|_ }}</em></td>
+        </tr>
+        <tr>
+            <td>
+                {{ 'total'|_ }}
+            </td>
+            <td style="text-align: right;">
+                {{ formatAmountBySymbol(sum.spent, primaryCurrency.currency_symbol, primaryCurrency.currency_decimal_places) }}
+            </td>
+            <td style="text-align: right;">
+                {{ formatAmountBySymbol(sum.earned, primaryCurrency.currency_symbol, primaryCurrency.currency_decimal_places) }}
+            </td>
+            <td style="text-align: right;">
+                {{ formatAmountBySymbol(sum.sum, primaryCurrency.currency_symbol, primaryCurrency.currency_decimal_places) }}
+            </td>
+        </tr>
+    {% endif %}
     </tfoot>
 </table>

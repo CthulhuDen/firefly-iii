@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers\Report;
 
+use FireflyIII\Models\Account;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use FireflyIII\Exceptions\FireflyException;
@@ -44,6 +45,8 @@ class AccountController extends Controller
      */
     public function general(Collection $accounts, Carbon $start, Carbon $end): string
     {
+        $accounts = $accounts->sortBy('order');
+
         // chart properties for cache:
         $cache         = new CacheProperties();
         $cache->addProperty($start);

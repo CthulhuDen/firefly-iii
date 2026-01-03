@@ -214,13 +214,8 @@ trait AugumentData
                 $currentEnd->addMonth();
             }
             // primary currency amount.
-            $expenses        = $opsRepository->sumExpenses($currentStart, $currentEnd, null, $budgetCollection, $entry->transactionCurrency, $this->convertToPrimary);
+            $expenses        = $opsRepository->sumExpenses($currentStart, $currentEnd, null, $budgetCollection, null, $this->convertToPrimary);
             $spent           = $expenses[$currency->id]['sum'] ?? '0';
-            $entry->pc_spent = $spent;
-
-            // normal amount:
-            $expenses        = $opsRepository->sumExpenses($currentStart, $currentEnd, null, $budgetCollection, $entry->transactionCurrency);
-            $spent           = $expenses[$entry->transactionCurrency->id]['sum'] ?? '0';
             $entry->spent    = $spent;
 
             $limits->push($entry);
